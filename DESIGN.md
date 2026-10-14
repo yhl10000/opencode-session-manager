@@ -54,6 +54,8 @@ At narrow widths, the panes stack vertically. The explorer remains bounded so th
 
 ## Interaction and accessibility
 
+The header language selector reuses the native select control and existing spacing, color and type tokens. Its visible label is localized; language names stay in their own language. English and Simplified Chinese switch immediately without remounting the explorer or dialogs. Dates, relative times and numbers follow the chosen language; user titles, paths, models and conversation text remain untouched. Language is persisted separately from view settings. Localized error explanations accompany selectable, unchanged technical diagnostics.
+
 Use brief opacity feedback rather than ornamental motion. Respect reduced-motion settings. Controls need clear hover, pressed, disabled, pending, and keyboard-focus states. Keep interface actions as native buttons, label search and sort controls, announce status changes, and distinguish selection with both surface treatment and an icon.
 
 Technical paths and IDs should remain selectable and wrap safely, including CJK text. Preview text should remain readable and clearly bounded. Target WCAG 2.2 AA, including visible keyboard focus and sufficient contrast.
