@@ -4,6 +4,14 @@
 
 本项目以 [MIT License](LICENSE) 发布。
 
+## 下载与安装
+
+在 [GitHub Releases](https://github.com/yhl10000/opencode-session-manager/releases/latest) 下载 Windows x64 的 `OpenCode Session Manager_<版本>_x64-setup.exe` 和 `SHA256SUMS.txt`。首个正式版本发布前，该页面可能没有可下载的安装包。
+
+安装包尚未进行代码签名，Windows SmartScreen 可能显示警告。请确认下载来源可信，并用 PowerShell 的 `Get-FileHash -Algorithm SHA256` 计算安装包哈希，与 `SHA256SUMS.txt` 中同名文件的哈希比较；哈希用于检查文件完整性，不替代发布者身份验证。
+
+安装包使用 Tauri 默认的 WebView2 下载引导程序：如果缺少 WebView2 Runtime，需要联网下载安装。PowerShell 7、Windows Terminal 和 OpenCode CLI 不随安装包提供，须单独安装并确保可通过 `PATH` 找到。完整要求见下文。
+
 ## 功能
 
 - 按项目分组浏览会话；项目组可独立展开、折叠和分页加载。
@@ -54,6 +62,8 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+node --test scripts/release-utils.test.mjs
+node scripts/release-utils.mjs validate
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 npm audit
@@ -64,7 +74,7 @@ npm audit
 在仓库根目录运行 Windows 桌面构建：
 
 ```powershell
-npm run tauri build
+npm run tauri build -- --bundles nsis -- --locked
 ```
 
 Tauri CLI 会将可执行文件和已配置的安装包写入 `src-tauri/target/release/`。也可以直接启动可执行文件：
@@ -110,5 +120,23 @@ Tauri CLI 会将可执行文件和已配置的安装包写入 `src-tauri/target/
 如果桌面窗口空白或无法启动，请检查 WebView2 Runtime 和 Tauri Windows 开发依赖。开发模式下可查看运行 `npm run tauri dev` 的终端输出。
 
 ## 发布验证
+
+GitHub Actions 的 `Windows Release` 工作流在推送 `vX.Y.Z` 标签时构建并发布 Windows x64 NSIS 安装包。仅接受无前导零的稳定版本，不接受预发布或构建元数据。工作流使用 Windows Server 2022、Node.js 24 与 Rust stable，运行前端检查、夹具测试、Rust 测试和 Clippy，再构建安装包。
+
+手动运行 `workflow_dispatch` **只构建，不创建 Release**。首次发布前应先在 Actions 中手动运行该工作流，确认云端构建成功；产物 `windows-x64-nsis` 保留 7 天，可下载用于安装验证。CI 不安装或调用真实 OpenCode，也不读取真实会话数据，夹具测试不能证明原生 TUI 可交互。
+
+发布操作顺序：
+
+1. 将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的应用版本同步更新，使用包管理工具同步 `package-lock.json` 与 `src-tauri/Cargo.lock` 中应用自身的版本，不手改依赖锁内容。
+2. 运行所有检查及 `node scripts/release-utils.mjs validate vX.Y.Z`（将 `X.Y.Z` 替换为待发布版本），提交并推送变更。先执行手动云端构建并验证下载的安装包。
+3. 从已验证的提交创建并推送标签。例如首版：
+
+```powershell
+node scripts/release-utils.mjs validate v0.1.0
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+工作流只上传经校验的单个安装包与 `SHA256SUMS.txt`。发布任务重新验证文件清单、文件名和 SHA256，再创建带完整资产的草稿并发布，不使用个人访问令牌。已存在同名 Release 时拒绝覆盖；上传或发布失败可能留下草稿，维护者须检查失败原因，不能通过覆盖已发布版本来重试。不要移动或复用发布标签。
 
 发布前请运行上述前端和 Rust 检查，并构建 Windows 应用。还应通过实际安装的程序检查面向用户的流程：安装和卸载、应用启动、数据库发现、会话浏览和详情预览，以及两种终端启动模式。检查原生 TUI 是否能继续交互。如果发布流程对产物签名，也应检查签名和签名产物的安装行为。仅构建成功或终端请求已分派不足以证明完整发布流程可用。
