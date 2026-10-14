@@ -108,3 +108,17 @@
 .row-delete {
   color: var(--error);
 }
+.rename-dialog label {
+  display: block;
+  margin-top: var(--s4);
+  margin-bottom: var(--s2);
+  color: var(--secondary);
+}
+.rename-dialog input {
+  width: 100%;
+  min-height: var(--control);
+  padding: var(--s2) var(--s3);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r2);
+  background: var(--inset);
+}
