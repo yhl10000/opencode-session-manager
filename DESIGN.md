@@ -39,7 +39,7 @@ Spacing follows a 4-pixel base. The available spacing tokens are 4, 8, 12, 16, 2
 
 ## Layout
 
-The application shell fills the viewport and keeps the header and status footer visible. The workspace has a project and session explorer beside a flexible detail pane. Each pane owns its content scrolling, preventing the page shell from becoming a competing scroll container.
+The application shell fills the viewport and keeps the header and status footer visible. The workspace has a project and session explorer beside a flexible detail pane. The explorer width is `clamp(480px, 57vw, 780px)`, 1.5 times its original desktop width. Each pane owns its content scrolling, preventing the page shell from becoming a competing scroll container.
 
 At narrow widths, the panes stack vertically. The explorer remains bounded so the detail pane can be reached without losing its own scroll behavior. Keep project groups in a continuous explorer rather than introducing a separate project-navigation gate.
 
