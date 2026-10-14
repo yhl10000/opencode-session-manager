@@ -1,14 +1,17 @@
 import { AlertCircle, CheckCircle2, Database, RefreshCw, Terminal, X } from "lucide-react";
 import { useCallback, useState } from "react";
+import { DeleteDialog } from "./components/DeleteDialog";
 import { DetailPanel } from "./components/DetailPanel";
 import { Explorer } from "./components/Explorer";
 import { type MenuPosition, SessionMenu } from "./components/SessionMenu";
 import { StatePanel } from "./components/StatePanel";
 import { useActions } from "./hooks/useActions";
 import { useCatalog } from "./hooks/useCatalog";
+import { useDeletion } from "./hooks/useDeletion";
 
 export function App() {
-  const { desktop, catalog, loading, error, refresh } = useCatalog();
+  const { desktop, catalog, loading, error, refresh, replaceCatalog } = useCatalog();
+  const deletion = useDeletion(replaceCatalog);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuPosition | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -54,6 +57,8 @@ export function App() {
               onSelect={setSelectedId}
               onLaunch={(id) => void actions.perform(id, "tab")}
               onMenu={setMenu}
+              onDelete={deletion.ask}
+              deleting={deletion.pending}
             />
             {selected ? (
               <DetailPanel
@@ -160,6 +165,15 @@ export function App() {
           onClose={closeMenu}
           disabled={actions.pending !== null}
           onAction={(id, action) => void actions.perform(id, action)}
+        />
+      )}
+      {deletion.request && (
+        <DeleteDialog
+          request={deletion.request}
+          pending={deletion.pending}
+          error={deletion.error}
+          onCancel={deletion.cancel}
+          onConfirm={() => void deletion.confirm()}
         />
       )}
     </div>

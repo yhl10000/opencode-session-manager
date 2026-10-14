@@ -1,8 +1,18 @@
-import { ChevronDown, ChevronRight, Folder, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  ListCollapse,
+  ListTree,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildGroups, isExpanded, loadMore, PAGE_SIZE } from "../lib/catalog";
 import { type Preferences, readPreferences, savePreferences } from "../lib/preferences";
 import type { Catalog } from "../lib/types";
+import type { DeleteRequest } from "./DeleteDialog";
 import type { MenuPosition } from "./SessionMenu";
 import { SessionRow } from "./SessionRow";
 import { StatePanel } from "./StatePanel";
@@ -13,8 +23,18 @@ type Props = {
   readonly onSelect: (id: string) => void;
   readonly onLaunch: (id: string) => void;
   readonly onMenu: (position: MenuPosition) => void;
+  readonly onDelete?: (request: DeleteRequest) => void;
+  readonly deleting?: boolean;
 };
-export function Explorer({ catalog, selectedId, onSelect, onLaunch, onMenu }: Props) {
+export function Explorer({
+  catalog,
+  selectedId,
+  onSelect,
+  onLaunch,
+  onMenu,
+  onDelete,
+  deleting,
+}: Props) {
   const [saved] = useState(readPreferences);
   const [preferences, setPreferences] = useState(saved.value);
   const [warning, setWarning] = useState(saved.warning);
@@ -35,6 +55,28 @@ export function Explorer({ catalog, selectedId, onSelect, onLaunch, onMenu }: Pr
         <div className="pane-title">
           <h2>Sessions</h2>
           <span className="count">{catalog.sessions.length.toLocaleString()}</span>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Collapse all projects"
+            title={query.trim() ? "Clear search to collapse all projects" : "Collapse all projects"}
+            disabled={Boolean(query.trim()) || catalog.projects.length === 0}
+            onClick={() =>
+              update({ ...preferences, collapsed: catalog.projects.map((project) => project.id) })
+            }
+          >
+            <ListCollapse aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Expand all projects"
+            title="Expand all projects"
+            disabled={Boolean(query.trim()) || catalog.projects.length === 0}
+            onClick={() => update({ ...preferences, collapsed: [] })}
+          >
+            <ListTree aria-hidden="true" />
+          </button>
         </div>
         <label className="search-label" htmlFor="session-search">
           Search all projects and sessions
@@ -89,35 +131,57 @@ export function Explorer({ catalog, selectedId, onSelect, onLaunch, onMenu }: Pr
           const remaining = Math.max(0, sessions.length - visible);
           return (
             <section className="project-group" key={project.id} aria-label={project.name}>
-              <button
-                type="button"
-                className="project-header"
-                aria-expanded={expanded}
-                aria-controls={`group-${project.id}`}
-                disabled={Boolean(query.trim())}
-                onClick={() =>
-                  update({
-                    ...preferences,
-                    collapsed: expanded
-                      ? [...preferences.collapsed, project.id]
-                      : preferences.collapsed.filter((id) => id !== project.id),
-                  })
-                }
-              >
-                {expanded ? (
-                  <ChevronDown aria-hidden="true" />
-                ) : (
-                  <ChevronRight aria-hidden="true" />
-                )}
-                <Folder aria-hidden="true" />
-                <span className="project-label">
-                  <strong title={project.name}>{project.name || "Unnamed project"}</strong>
-                  <span className="mono" title={project.path}>
-                    {project.path || "Path unavailable"}
+              <div className="project-heading">
+                <button
+                  type="button"
+                  className="project-header"
+                  aria-expanded={expanded}
+                  aria-controls={`group-${project.id}`}
+                  disabled={Boolean(query.trim())}
+                  onClick={() =>
+                    update({
+                      ...preferences,
+                      collapsed: expanded
+                        ? [...preferences.collapsed, project.id]
+                        : preferences.collapsed.filter((id) => id !== project.id),
+                    })
+                  }
+                >
+                  {expanded ? (
+                    <ChevronDown aria-hidden="true" />
+                  ) : (
+                    <ChevronRight aria-hidden="true" />
+                  )}
+                  <Folder aria-hidden="true" />
+                  <span className="project-label">
+                    <strong title={project.name}>{project.name || "Unnamed project"}</strong>
+                    <span className="mono" title={project.path}>
+                      {project.path || "Path unavailable"}
+                    </span>
                   </span>
-                </span>
-                <span className="count">{sessions.length}</span>
-              </button>
+                  <span className="count">{sessions.length}</span>
+                </button>
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="icon-button row-delete"
+                    aria-label={`Delete project ${project.name}`}
+                    title="Delete all project sessions"
+                    disabled={deleting}
+                    onClick={() =>
+                      onDelete({
+                        label: project.name,
+                        path: project.path,
+                        ids: catalog.sessions
+                          .filter((session) => session.projectId === project.id)
+                          .map((session) => session.id),
+                      })
+                    }
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                )}
+              </div>
               {expanded && (
                 <div id={`group-${project.id}`} className="project-sessions">
                   {sessions.slice(0, visible).map((session) => (
@@ -128,6 +192,17 @@ export function Explorer({ catalog, selectedId, onSelect, onLaunch, onMenu }: Pr
                       onSelect={onSelect}
                       onLaunch={onLaunch}
                       onMenu={onMenu}
+                      deleting={deleting}
+                      onDelete={
+                        onDelete
+                          ? () =>
+                              onDelete({
+                                label: session.title,
+                                path: session.directory,
+                                ids: [session.id],
+                              })
+                          : undefined
+                      }
                     />
                   ))}
                   {sessions.length === 0 && (

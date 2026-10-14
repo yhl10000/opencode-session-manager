@@ -1,4 +1,4 @@
-import { Check, MessageSquare, MoreHorizontal } from "lucide-react";
+import { Check, MessageSquare, MoreHorizontal, Trash2 } from "lucide-react";
 import { available, localTime, relativeTime } from "../lib/format";
 import type { SessionSummary } from "../lib/types";
 import type { MenuPosition } from "./SessionMenu";
@@ -9,8 +9,18 @@ type Props = {
   readonly onSelect: (id: string) => void;
   readonly onLaunch: (id: string) => void;
   readonly onMenu: (position: MenuPosition) => void;
+  readonly onDelete?: ((id: string) => void) | undefined;
+  readonly deleting?: boolean | undefined;
 };
-export function SessionRow({ session, selected, onSelect, onLaunch, onMenu }: Props) {
+export function SessionRow({
+  session,
+  selected,
+  onSelect,
+  onLaunch,
+  onMenu,
+  onDelete,
+  deleting,
+}: Props) {
   return (
     <div className={`session-row ${selected ? "selected" : ""}`}>
       <button
@@ -70,6 +80,18 @@ export function SessionRow({ session, selected, onSelect, onLaunch, onMenu }: Pr
           {relativeTime(session.updatedAt)}
         </time>
       </button>
+      {onDelete && (
+        <button
+          type="button"
+          className="icon-button row-delete"
+          aria-label={`Delete session ${session.title || "Untitled session"}`}
+          title="Delete session"
+          disabled={deleting}
+          onClick={() => onDelete(session.id)}
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      )}
       <button
         type="button"
         className="icon-button row-more"
