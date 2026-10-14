@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import type { DeleteRequest } from "../components/DeleteDialog";
+import type { UiMessage } from "../i18n/messages";
 import { api, errorMessage } from "../lib/api";
 import type { Catalog } from "../lib/types";
 
 export function useDeletion(replaceCatalog: (catalog: Catalog) => void) {
   const [request, setRequest] = useState<DeleteRequest | null>(null);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiMessage | null>(null);
   const busy = useRef(false);
   function ask(next: DeleteRequest) {
     if (!busy.current) {
@@ -33,7 +34,7 @@ export function useDeletion(replaceCatalog: (catalog: Catalog) => void) {
           result.catalog.sessions.some((session) => session.id === id),
         );
         setRequest({ ...request, ids: remaining });
-        setError(result.errors.join("\n"));
+        setError({ key: "deletionError", detail: result.errors.join("\n") });
       } else {
         setRequest(null);
       }

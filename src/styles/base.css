@@ -135,6 +135,24 @@ h2 {
   width: var(--line);
   background: var(--border);
 }
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--secondary);
+  white-space: nowrap;
+}
+.language-selector select {
+  min-height: var(--control);
+  padding: var(--s2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r2);
+  background: var(--elevated);
+}
+.technical-detail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .workspace {
   display: grid;
   grid-template-columns: clamp(320px, 38vw, 520px) minmax(0, 1fr);
@@ -189,6 +207,15 @@ h2 {
     flex-wrap: wrap;
   }
   .brand > span:last-child {
+    font-size: var(--text-xs);
+  }
+  .header-actions {
+    flex-shrink: 0;
+  }
+  .language-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
     font-size: var(--text-xs);
   }
   .workspace {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { UiMessage } from "../i18n/messages";
 import { api, errorMessage, isDesktop } from "../lib/api";
 import type { Catalog } from "../lib/types";
 
@@ -6,7 +7,7 @@ export function useCatalog() {
   const desktop = isDesktop();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(desktop);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiMessage | null>(null);
   const generation = useRef(0);
   const refresh = useCallback(async () => {
     if (!desktop) return;

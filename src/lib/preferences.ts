@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { UiMessage } from "../i18n/messages";
 
 const KEY = "opencode-session-manager.preferences";
 const schema = z
@@ -19,7 +20,7 @@ const defaults: Preferences = {
 
 export function readPreferences(): {
   readonly value: Preferences;
-  readonly warning: string | null;
+  readonly warning: UiMessage | null;
 } {
   try {
     const stored = localStorage.getItem(KEY);
@@ -27,25 +28,20 @@ export function readPreferences(): {
     const parsed = schema.safeParse(JSON.parse(stored));
     return parsed.success
       ? { value: parsed.data, warning: null }
-      : { value: defaults, warning: "Saved view settings were invalid and have been reset." };
+      : { value: defaults, warning: { key: "settingsReset" } };
   } catch (error) {
     return {
       value: defaults,
-      warning:
-        error instanceof Error
-          ? `View settings could not be read: ${error.message}`
-          : "View settings could not be read.",
+      warning: { key: "settingsRead", detail: error instanceof Error ? error.message : undefined },
     };
   }
 }
 
-export function savePreferences(preferences: Preferences): string | null {
+export function savePreferences(preferences: Preferences): UiMessage | null {
   try {
     localStorage.setItem(KEY, JSON.stringify(preferences));
     return null;
   } catch (error) {
-    return error instanceof Error
-      ? `View settings could not be saved: ${error.message}`
-      : "View settings could not be saved.";
+    return { key: "settingsSave", detail: error instanceof Error ? error.message : undefined };
   }
 }

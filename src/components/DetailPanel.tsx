@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { SessionAction } from "../hooks/useActions";
 import { useDetail } from "../hooks/useDetail";
+import { Message, useLocale } from "../i18n/locale";
 import { available, localTime } from "../lib/format";
 import { assertNever, type Resource, type SessionDetail, type SessionSummary } from "../lib/types";
 import { StatePanel } from "./StatePanel";
@@ -26,49 +27,51 @@ function Preview({
   readonly state: Resource<SessionDetail>;
   readonly retry: () => void;
 }) {
+  const { t, locale } = useLocale();
   switch (state.status) {
     case "loading":
       return (
         <div className="preview-placeholder" role="status">
-          Loading read-only preview...
+          {t("loadingPreview")}
         </div>
       );
     case "error":
       return (
         <StatePanel
           kind="error"
-          title="Preview could not load"
+          title={t("previewFailed")}
           action={
             <button type="button" onClick={retry}>
-              Retry preview
+              {t("retryPreview")}
             </button>
           }
         >
-          {state.error}
+          <Message message={state.error} />
         </StatePanel>
       );
     case "ready":
       return (
         <>
           {state.data.preview.length === 0 && (
-            <StatePanel title="No text preview">
-              This session has no previewable messages. You can still open it in OpenCode.
-            </StatePanel>
+            <StatePanel title={t("noPreview")}>{t("noPreviewExplanation")}</StatePanel>
           )}
           {state.data.preview.map((message) => (
             <article className="preview-message" key={message.id}>
               <div className="message-heading">
-                <strong>{message.role}</strong>
-                <time>{localTime(message.createdAt)}</time>
+                <strong>
+                  {message.role === "user" ||
+                  message.role === "assistant" ||
+                  message.role === "system" ||
+                  message.role === "tool"
+                    ? t(message.role)
+                    : message.role}
+                </strong>
+                <time>{localTime(message.createdAt, locale)}</time>
               </div>
-              <pre>{message.text || "No text content"}</pre>
+              <pre>{message.text || t("noText")}</pre>
             </article>
           ))}
-          {state.data.previewTruncated && (
-            <p className="preview-note">
-              Preview truncated. Open the session in OpenCode for the full conversation.
-            </p>
-          )}
+          {state.data.previewTruncated && <p className="preview-note">{t("previewTruncated")}</p>}
         </>
       );
     default:
@@ -76,25 +79,26 @@ function Preview({
   }
 }
 export function DetailPanel({ session, projectName, pending, onAction }: Props) {
+  const { t, locale, number } = useLocale();
   const { state, retry } = useDetail(session.id);
   const data = state.status === "ready" ? state.data.session : session;
   return (
-    <section className="detail" aria-label="Session details">
+    <section className="detail" aria-label={t("details")}>
       <header className="detail-toolbar">
         <span>
           <MessageSquare aria-hidden="true" />
-          Session details
+          {t("details")}
         </span>
         <span className="read-only">
           <LockKeyhole aria-hidden="true" />
-          Read only
+          {t("readOnly")}
         </span>
       </header>
       <div className="detail-scroll">
         <div className="session-heading">
           <div className="eyebrow">{projectName}</div>
-          <h1>{data.title || "Untitled session"}</h1>
-          <p className="directory mono">{data.directory || "Directory unavailable"}</p>
+          <h1>{data.title || t("untitled")}</h1>
+          <p className="directory mono">{data.directory || t("directoryUnavailable")}</p>
         </div>
         <div className="session-actions">
           <button
@@ -104,18 +108,18 @@ export function DetailPanel({ session, projectName, pending, onAction }: Props) 
             onClick={() => onAction(session.id, "tab")}
           >
             <PanelTop aria-hidden="true" />
-            {pending ? "Dispatching..." : "Open in tab"}
+            {t(pending ? "dispatching" : "openTab")}
           </button>
           <button type="button" disabled={pending} onClick={() => onAction(session.id, "window")}>
             <SquareArrowOutUpRight aria-hidden="true" />
-            Open in window
+            {t("openWindow")}
           </button>
           <button
             type="button"
             className="icon-button"
             disabled={state.status === "loading"}
-            title="Refresh session metadata"
-            aria-label="Refresh session metadata"
+            title={t("refreshMetadata")}
+            aria-label={t("refreshMetadata")}
             onClick={retry}
           >
             <RefreshCw aria-hidden="true" />
@@ -124,8 +128,8 @@ export function DetailPanel({ session, projectName, pending, onAction }: Props) 
             type="button"
             className="icon-button"
             disabled={pending}
-            title="Open directory"
-            aria-label="Open directory"
+            title={t("openDirectory")}
+            aria-label={t("openDirectory")}
             onClick={() => onAction(session.id, "directory")}
           >
             <FolderOpen aria-hidden="true" />
@@ -133,14 +137,14 @@ export function DetailPanel({ session, projectName, pending, onAction }: Props) 
         </div>
         <dl className="metadata">
           <div className="metadata-wide">
-            <dt>Session ID</dt>
+            <dt>{t("sessionId")}</dt>
             <dd className="id-value">
               <span className="mono">{data.id}</span>
               <button
                 type="button"
                 className="icon-button"
-                title="Copy session ID"
-                aria-label="Copy session ID"
+                title={t("copyId")}
+                aria-label={t("copyId")}
                 disabled={pending}
                 onClick={() => onAction(session.id, "copy")}
               >
@@ -149,39 +153,39 @@ export function DetailPanel({ session, projectName, pending, onAction }: Props) 
             </dd>
           </div>
           <div>
-            <dt>Model</dt>
-            <dd>{available(data.model)}</dd>
+            <dt>{t("model")}</dt>
+            <dd>{available(data.model, locale)}</dd>
           </div>
           <div>
-            <dt>Provider</dt>
-            <dd>{available(data.provider)}</dd>
+            <dt>{t("provider")}</dt>
+            <dd>{available(data.provider, locale)}</dd>
           </div>
           <div>
-            <dt>Messages</dt>
-            <dd>{data.messageCount.toLocaleString()}</dd>
+            <dt>{t("messageLabel")}</dt>
+            <dd>{number(data.messageCount)}</dd>
           </div>
           <div>
-            <dt>Tokens</dt>
-            <dd>{data.tokens === null ? "Unavailable" : data.tokens.toLocaleString()}</dd>
+            <dt>{t("tokenLabel")}</dt>
+            <dd>{data.tokens === null ? t("unavailable") : number(data.tokens)}</dd>
           </div>
           <div>
-            <dt>Created</dt>
-            <dd>{localTime(data.createdAt)}</dd>
+            <dt>{t("created")}</dt>
+            <dd>{localTime(data.createdAt, locale)}</dd>
           </div>
           <div>
-            <dt>Last activity</dt>
-            <dd>{localTime(data.updatedAt)}</dd>
+            <dt>{t("lastActivity")}</dt>
+            <dd>{localTime(data.updatedAt, locale)}</dd>
           </div>
           {data.parentId !== null && (
             <div className="metadata-wide">
-              <dt>Parent session</dt>
+              <dt>{t("parentSession")}</dt>
               <dd className="mono">{data.parentId}</dd>
             </div>
           )}
         </dl>
         <div className="preview-heading">
-          <h2>Conversation preview</h2>
-          <span>Plain text / read only</span>
+          <h2>{t("conversationPreview")}</h2>
+          <span>{t("plainText")}</span>
         </div>
         <div className="preview">
           <Preview state={state} retry={retry} />

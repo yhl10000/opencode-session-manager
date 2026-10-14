@@ -1,5 +1,6 @@
 import { ListCollapse, ListTree, Search, X } from "lucide-react";
 import type { useExplorerView } from "../hooks/useExplorerView";
+import { Message, useLocale } from "../i18n/locale";
 import type { Catalog } from "../lib/types";
 
 type Props = {
@@ -8,17 +9,18 @@ type Props = {
 };
 
 export function ExplorerToolbar({ catalog, view }: Props) {
+  const { t, number } = useLocale();
   const { preferences, warning, query, setQuery, groups, update, count } = view;
   return (
     <div className="explorer-toolbar">
       <div className="pane-title">
-        <h2>Sessions</h2>
-        <span className="count">{count.toLocaleString()}</span>
+        <h2>{t("sessions")}</h2>
+        <span className="count">{number(count)}</span>
         <button
           type="button"
           className="icon-button"
-          aria-label="Collapse all projects"
-          title={query.trim() ? "Clear search to collapse all projects" : "Collapse all projects"}
+          aria-label={t("collapseAll")}
+          title={t(query.trim() ? "clearToCollapse" : "collapseAll")}
           disabled={Boolean(query.trim()) || groups.length === 0}
           onClick={() =>
             update({ ...preferences, collapsed: catalog.projects.map((project) => project.id) })
@@ -29,8 +31,8 @@ export function ExplorerToolbar({ catalog, view }: Props) {
         <button
           type="button"
           className="icon-button"
-          aria-label="Expand all projects"
-          title="Expand all projects"
+          aria-label={t("expandAll")}
+          title={t("expandAll")}
           disabled={Boolean(query.trim()) || groups.length === 0}
           onClick={() => update({ ...preferences, collapsed: [] })}
         >
@@ -38,14 +40,14 @@ export function ExplorerToolbar({ catalog, view }: Props) {
         </button>
       </div>
       <label className="search-label" htmlFor="session-search">
-        Search all projects and sessions
+        {t("searchLabel")}
       </label>
       <div className="search-field">
         <Search aria-hidden="true" />
         <input
           id="session-search"
           type="search"
-          placeholder="Title, project, ID, path or model"
+          placeholder={t("searchPlaceholder")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -53,7 +55,7 @@ export function ExplorerToolbar({ catalog, view }: Props) {
           <button
             type="button"
             className="icon-button"
-            aria-label="Clear search"
+            aria-label={t("clearSearch")}
             onClick={() => setQuery("")}
           >
             <X aria-hidden="true" />
@@ -61,19 +63,23 @@ export function ExplorerToolbar({ catalog, view }: Props) {
         )}
       </div>
       <div className="sort-line">
-        <span>{query.trim() ? `${count} matches` : `${groups.length} projects`}</span>
+        <span>
+          {t(query.trim() ? "matches" : "projects", {
+            count: number(query.trim() ? count : groups.length),
+          })}
+        </span>
         <label>
-          Sort by{" "}
+          {t("sortBy")}{" "}
           <select
-            aria-label="Sort projects"
+            aria-label={t("sortProjects")}
             value={preferences.sort}
             onChange={(event) => {
               const sort = event.target.value;
               if (sort === "activity" || sort === "name") update({ ...preferences, sort });
             }}
           >
-            <option value="activity">Latest activity</option>
-            <option value="name">Project name</option>
+            <option value="activity">{t("latestActivity")}</option>
+            <option value="name">{t("projectName")}</option>
           </select>
         </label>
       </div>
@@ -83,11 +89,11 @@ export function ExplorerToolbar({ catalog, view }: Props) {
           checked={preferences.showChildSessions}
           onChange={(event) => update({ ...preferences, showChildSessions: event.target.checked })}
         />
-        Show child sessions
+        {t("showChildren")}
       </label>
       {warning && (
         <p className="inline-warning" role="status">
-          {warning}
+          <Message message={warning} />
         </p>
       )}
     </div>

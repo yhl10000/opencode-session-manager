@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
+import type { UiMessage } from "../i18n/messages";
 import { api, errorMessage } from "../lib/api";
 import type { Catalog, SessionSummary } from "../lib/types";
 
 export function useRename(replaceCatalog: (catalog: Catalog) => void) {
   const [session, setSession] = useState<SessionSummary | null>(null);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiMessage | null>(null);
   const [revision, setRevision] = useState(0);
   const busy = useRef(false);
   function ask(next: SessionSummary) {

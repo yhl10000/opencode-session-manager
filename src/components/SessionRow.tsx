@@ -1,4 +1,5 @@
 import { Check, MessageSquare, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
+import { useLocale } from "../i18n/locale";
 import { available, localTime, relativeTime } from "../lib/format";
 import type { SessionSummary } from "../lib/types";
 import type { MenuPosition } from "./SessionMenu";
@@ -25,12 +26,14 @@ export function SessionRow({
   pinned,
   onTogglePin,
 }: Props) {
+  const { t, locale, number, compact } = useLocale();
+  const title = session.title || t("untitled");
   return (
     <div className={`session-row ${selected ? "selected" : ""}`}>
       <button
         type="button"
         className="session-select"
-        aria-label={`Select ${session.title || "Untitled session"}`}
+        aria-label={t("selectSession", { title })}
         aria-pressed={selected}
         onClick={() => onSelect(session.id)}
         onDoubleClick={() => onLaunch(session.id)}
@@ -61,36 +64,32 @@ export function SessionRow({
         </span>
         <span className="row-content">
           <span className="row-title" title={session.title}>
-            {session.title || "Untitled session"}
+            {title}
           </span>
           <span className="row-meta">
-            <span title={available(session.model)}>{available(session.model)}</span>
-            <span>{session.messageCount} messages</span>
+            <span title={available(session.model, locale)}>{available(session.model, locale)}</span>
+            <span>{t("messages", { count: number(session.messageCount) })}</span>
             {session.tokens !== null && (
-              <span title={`${session.tokens.toLocaleString()} tokens`}>
-                {new Intl.NumberFormat("en", {
-                  notation: "compact",
-                  maximumFractionDigits: 1,
-                }).format(session.tokens)}{" "}
-                tokens
+              <span title={t("tokens", { count: number(session.tokens) })}>
+                {t("tokens", { count: compact(session.tokens) })}
               </span>
             )}
           </span>
         </span>
         <time
           dateTime={new Date(session.updatedAt).toISOString()}
-          title={localTime(session.updatedAt)}
+          title={localTime(session.updatedAt, locale)}
         >
-          {relativeTime(session.updatedAt)}
+          {relativeTime(session.updatedAt, locale)}
         </time>
       </button>
       {onTogglePin && (
         <button
           type="button"
           className="icon-button row-pin"
-          aria-label={`${pinned ? "Unpin" : "Pin"} session ${session.title || "Untitled session"}`}
+          aria-label={t(pinned ? "unpinSession" : "pinSession", { title })}
           aria-pressed={Boolean(pinned)}
-          title={pinned ? "Unpin session" : "Pin session in project"}
+          title={t(pinned ? "unpinHint" : "pinHint")}
           onClick={() => onTogglePin(session.id)}
         >
           {pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
@@ -100,8 +99,8 @@ export function SessionRow({
         <button
           type="button"
           className="icon-button row-delete"
-          aria-label={`Delete session ${session.title || "Untitled session"}`}
-          title="Delete session"
+          aria-label={t("deleteSession", { title })}
+          title={t("deleteHint")}
           disabled={deleting}
           onClick={() => onDelete(session.id)}
         >
@@ -111,8 +110,8 @@ export function SessionRow({
       <button
         type="button"
         className="icon-button row-more"
-        aria-label={`Actions for ${session.title || "Untitled session"}`}
-        title="Session actions"
+        aria-label={t("actionsFor", { title })}
+        title={t("sessionActions")}
         onClick={(event) => {
           const bounds = event.currentTarget.getBoundingClientRect();
           onMenu({

@@ -1,6 +1,7 @@
 import { Copy, FolderOpen, PanelTop, Pencil, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SessionAction } from "../hooks/useActions";
+import { useLocale } from "../i18n/locale";
 
 export type MenuPosition = {
   readonly sessionId: string;
@@ -16,13 +17,14 @@ type Props = {
   readonly onRename?: (id: string) => void;
 };
 const items = [
-  { action: "tab", label: "Open in tab", Icon: PanelTop },
-  { action: "window", label: "Open in window", Icon: SquareArrowOutUpRight },
-  { action: "copy", label: "Copy session ID", Icon: Copy },
-  { action: "directory", label: "Open directory", Icon: FolderOpen },
+  { action: "tab", label: "openTab", Icon: PanelTop },
+  { action: "window", label: "openWindow", Icon: SquareArrowOutUpRight },
+  { action: "copy", label: "copyId", Icon: Copy },
+  { action: "directory", label: "openDirectory", Icon: FolderOpen },
 ] as const;
 
 export function SessionMenu({ position, onClose, onAction, disabled, onRename }: Props) {
+  const { t } = useLocale();
   const menu = useRef<HTMLDivElement>(null);
   const [point, setPoint] = useState({ x: position.x, y: position.y });
   useLayoutEffect(() => {
@@ -53,7 +55,7 @@ export function SessionMenu({ position, onClose, onAction, disabled, onRename }:
       ref={menu}
       className="session-menu"
       role="menu"
-      aria-label="Session actions"
+      aria-label={t("sessionActions")}
       style={{ left: point.x, top: point.y }}
       onKeyDown={(event) => {
         const buttons = Array.from(
@@ -102,7 +104,7 @@ export function SessionMenu({ position, onClose, onAction, disabled, onRename }:
           }}
         >
           <Icon aria-hidden="true" />
-          {label}
+          {t(label)}
         </button>
       ))}
       {onRename && (
@@ -118,7 +120,7 @@ export function SessionMenu({ position, onClose, onAction, disabled, onRename }:
           }}
         >
           <Pencil aria-hidden="true" />
-          Rename session
+          {t("rename")}
         </button>
       )}
     </div>

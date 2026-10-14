@@ -10,8 +10,17 @@ import { useActions } from "./hooks/useActions";
 import { useCatalog } from "./hooks/useCatalog";
 import { useDeletion } from "./hooks/useDeletion";
 import { useRename } from "./hooks/useRename";
+import { LocaleProvider, Message, useLocale } from "./i18n/locale";
 
 export function App() {
+  return (
+    <LocaleProvider>
+      <Workspace />
+    </LocaleProvider>
+  );
+}
+function Workspace() {
+  const { t, number, locale, setLocale, warning } = useLocale();
   const { desktop, catalog, loading, error, refresh, replaceCatalog } = useCatalog();
   const deletion = useDeletion(replaceCatalog);
   const rename = useRename(replaceCatalog);
@@ -34,18 +43,35 @@ export function App() {
           <Terminal aria-hidden="true" />
           <strong>OpenCode</strong>
           <span className="header-divider" />
-          <span>Session Manager</span>
+          <span>{t("manager")}</span>
         </div>
         <div className="header-actions">
+          <label className="language-selector">
+            <span>{t("language")}</span>
+            <select
+              value={locale}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === "en" || next === "zh-CN") setLocale(next);
+              }}
+            >
+              <option value="zh-CN" lang="zh-CN">
+                简体中文
+              </option>
+              <option value="en" lang="en">
+                English
+              </option>
+            </select>
+          </label>
           <span className="local-label">
             <Database aria-hidden="true" />
-            Local workspace
+            {t("localWorkspace")}
           </span>
           <button
             type="button"
             className="icon-button"
-            aria-label="Refresh sessions"
-            title="Refresh sessions"
+            aria-label={t("refreshSessions")}
+            title={t("refreshSessions")}
             disabled={!desktop || loading}
             onClick={() => void refresh()}
           >
@@ -55,9 +81,8 @@ export function App() {
       </header>
       <main className="workspace">
         {!desktop ? (
-          <StatePanel kind="desktop" title="Desktop app required">
-            Open the Windows desktop app to browse your local OpenCode database. This browser cannot
-            access sessions or launch Windows Terminal.
+          <StatePanel kind="desktop" title={t("desktopRequired")}>
+            {t("desktopExplanation")}
           </StatePanel>
         ) : catalog ? (
           <>
@@ -78,57 +103,53 @@ export function App() {
                 session={selected}
                 projectName={
                   catalog.projects.find((project) => project.id === selected.projectId)?.name ??
-                  "Project unavailable"
+                  t("projectUnavailable")
                 }
                 pending={actions.pending !== null}
                 onAction={(id, action) => void actions.perform(id, action)}
               />
             ) : (
               <section className="detail">
-                <header className="detail-toolbar">Session details</header>
+                <header className="detail-toolbar">{t("details")}</header>
                 <StatePanel
-                  title={
-                    catalog.sessions.length === 0 ? "No sessions yet" : "Pick up where you left off"
-                  }
+                  title={catalog.sessions.length === 0 ? t("noSessions") : t("pickSession")}
                   action={
                     catalog.sessions.length === 0 ? (
                       <button type="button" onClick={() => void refresh()}>
-                        Refresh sessions
+                        {t("refreshSessions")}
                       </button>
                     ) : undefined
                   }
                 >
-                  {catalog.sessions.length === 0
-                    ? "Create a session in OpenCode, then refresh this workspace."
-                    : "Select a session from any project to inspect its details and read-only preview. Open it when you are ready to continue."}
+                  {catalog.sessions.length === 0 ? t("createSession") : t("selectExplanation")}
                 </StatePanel>
               </section>
             )}
           </>
         ) : loading ? (
-          <StatePanel title="Reading local sessions">
-            Loading project and session metadata from your OpenCode database...
-          </StatePanel>
+          <StatePanel title={t("readingSessions")}>{t("loadingCatalog")}</StatePanel>
         ) : (
           <StatePanel
             kind="error"
-            title="Sessions could not load"
+            title={t("loadFailed")}
             action={
               <button type="button" onClick={() => void refresh()}>
-                Retry loading
+                {t("retryLoading")}
               </button>
             }
           >
-            {error ?? "Refresh to try reading the local database again."}
+            {error ? <Message message={error} /> : t("refreshDatabase")}
           </StatePanel>
         )}
       </main>
       {catalog && error && (
         <div className="refresh-error" role="alert">
           <AlertCircle aria-hidden="true" />
-          <span>Refresh failed. Showing the previous catalog. {error}</span>
+          <span>
+            {t("refreshFailed")} <Message message={error} />
+          </span>
           <button type="button" disabled={loading} onClick={() => void refresh()}>
-            Retry refresh
+            {t("retryRefresh")}
           </button>
         </div>
       )}
@@ -142,35 +163,41 @@ export function App() {
           ) : (
             <CheckCircle2 aria-hidden="true" />
           )}
-          <span>{actions.notice.text}</span>
+          <span>
+            <Message message={actions.notice.message} />
+          </span>
           <button
             type="button"
             className="icon-button"
-            aria-label="Dismiss notification"
+            aria-label={t("dismiss")}
             onClick={actions.dismiss}
           >
             <X aria-hidden="true" />
           </button>
         </div>
       )}
+      {warning && (
+        <div className="refresh-error" role="status">
+          <Message message={warning} />
+        </div>
+      )}
       <footer className="status-bar">
         <span>
           <Database aria-hidden="true" />
-          {loading
-            ? "Reading database..."
-            : desktop
-              ? "Local database"
-              : "Desktop connection unavailable"}
+          {loading ? t("readingDatabase") : desktop ? t("localDatabase") : t("desktopUnavailable")}
         </span>
         <span className="database-path mono" title={catalog?.databasePath}>
           {catalog?.databasePath}
         </span>
         <span>
           {catalog
-            ? `${counts.projects} projects / ${counts.sessions} sessions`
-            : "Local data stays on this device"}
+            ? t("catalogCounts", {
+                projects: number(counts.projects),
+                sessions: number(counts.sessions),
+              })
+            : t("localData")}
         </span>
-        <span>OpenCode {catalog?.opencodeVersion || "version unavailable"}</span>
+        <span>OpenCode {catalog?.opencodeVersion || t("versionUnavailable")}</span>
       </footer>
       {menu && (
         <SessionMenu

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { Message, useLocale } from "../i18n/locale";
+import type { UiMessage } from "../i18n/messages";
 
 export type DeleteRequest = {
   readonly label: string;
@@ -10,12 +12,13 @@ export type DeleteRequest = {
 type Props = {
   readonly request: DeleteRequest;
   readonly pending: boolean;
-  readonly error: string | null;
+  readonly error: UiMessage | null;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 };
 
 export function DeleteDialog({ request, pending, error, onCancel, onConfirm }: Props) {
+  const { t, number } = useLocale();
   const panel = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -60,26 +63,25 @@ export function DeleteDialog({ request, pending, error, onCancel, onConfirm }: P
           }
         }}
       >
-        <h2 id="delete-title">Delete {request.label}?</h2>
+        <h2 id="delete-title">{t("deleteTitle", { title: request.label || t("untitled") })}</h2>
         <p id="delete-description">
-          Permanently delete {request.ids.length} sessions and their conversation history from
-          OpenCode. This cannot be undone. Project files and folders will not be deleted.
+          {t("deleteExplanation", { count: number(request.ids.length) })}
         </p>
         {Boolean(request.hiddenChildCount) && (
-          <p>Includes {request.hiddenChildCount} hidden child sessions.</p>
+          <p>{t("hiddenChildren", { count: number(request.hiddenChildCount ?? 0) })}</p>
         )}
         <p className="mono">{request.path}</p>
         {error && (
           <p className="error" role="alert">
-            {error}
+            <Message message={error} />
           </p>
         )}
         <div className="dialog-actions">
           <button ref={cancel} type="button" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </button>
           <button type="button" className="delete-confirm" disabled={pending} onClick={onConfirm}>
-            {pending ? "Deleting..." : "Confirm deletion"}
+            {t(pending ? "deleting" : "confirmDeletion")}
           </button>
         </div>
       </div>

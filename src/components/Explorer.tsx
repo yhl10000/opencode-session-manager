@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Folder, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useExplorerView } from "../hooks/useExplorerView";
+import { useLocale } from "../i18n/locale";
 import { isExpanded, loadMore, PAGE_SIZE } from "../lib/catalog";
 import type { Catalog } from "../lib/types";
 import type { DeleteRequest } from "./DeleteDialog";
@@ -34,6 +35,7 @@ export function Explorer({
   onHideChildren,
   onCountsChange,
 }: Props) {
+  const { t, number } = useLocale();
   const view = useExplorerView(catalog);
   const { preferences, query, setQuery, groups, update, togglePin, count } = view;
   const [pages, setPages] = useState<Readonly<Record<string, number>>>({});
@@ -44,7 +46,7 @@ export function Explorer({
     if (!preferences.showChildSessions) onHideChildren?.();
   }, [preferences.showChildSessions, onHideChildren]);
   return (
-    <aside className="explorer" aria-label="Project and session explorer">
+    <aside className="explorer" aria-label={t("explorer")}>
       <ExplorerToolbar catalog={catalog} view={view} />
       <div className="explorer-scroll">
         {groups.map(({ project, sessions }) => {
@@ -76,19 +78,19 @@ export function Explorer({
                   )}
                   <Folder aria-hidden="true" />
                   <span className="project-label">
-                    <strong title={project.name}>{project.name || "Unnamed project"}</strong>
+                    <strong title={project.name}>{project.name || t("unnamedProject")}</strong>
                     <span className="mono" title={project.path}>
-                      {project.path || "Path unavailable"}
+                      {project.path || t("pathUnavailable")}
                     </span>
                   </span>
-                  <span className="count">{sessions.length}</span>
+                  <span className="count">{number(sessions.length)}</span>
                 </button>
                 {onDelete && (
                   <button
                     type="button"
                     className="icon-button row-delete"
-                    aria-label={`Delete project ${project.name}`}
-                    title="Delete all project sessions"
+                    aria-label={t("deleteProject", { name: project.name || t("unnamedProject") })}
+                    title={t("deleteProjectHint")}
                     disabled={deleting}
                     onClick={() =>
                       onDelete({
@@ -136,16 +138,15 @@ export function Explorer({
                       }
                     />
                   ))}
-                  {sessions.length === 0 && (
-                    <p className="group-empty">No sessions in this project.</p>
-                  )}
+                  {sessions.length === 0 && <p className="group-empty">{t("emptyProject")}</p>}
                   {remaining > 0 && (
                     <button
                       type="button"
                       className="load-more"
                       onClick={() => setPages((current) => loadMore(current, project.id))}
                     >
-                      Load {Math.min(PAGE_SIZE, remaining)} more <span>{remaining} remaining</span>
+                      {t("loadMore", { count: number(Math.min(PAGE_SIZE, remaining)) })}{" "}
+                      <span>{t("remaining", { count: number(remaining) })}</span>
                     </button>
                   )}
                 </div>
@@ -156,19 +157,19 @@ export function Explorer({
         {groups.length === 0 && (
           <StatePanel
             kind="search"
-            title="No matching sessions"
+            title={t("noMatches")}
             action={
               <button type="button" onClick={() => setQuery("")}>
-                Clear search
+                {t("clearSearch")}
               </button>
             }
           >
-            Try another title, project, ID, path or model.
+            {t("searchExplanation")}
           </StatePanel>
         )}
       </div>
       <div className="explorer-hint">
-        Double-click to open in a tab <span>Right-click for actions</span>
+        {t("doubleClick")} <span>{t("rightClick")}</span>
       </div>
     </aside>
   );

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { UiMessage } from "../i18n/messages";
 
 export const projectSchema = z
   .object({
@@ -65,7 +66,7 @@ export type SortOrder = "activity" | "name";
 export type LaunchMode = "tab" | "window";
 export type Resource<T> =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly error: string }
+  | { readonly status: "error"; readonly error: UiMessage }
   | { readonly status: "ready"; readonly data: T };
 
 export function assertNever(value: never): never {

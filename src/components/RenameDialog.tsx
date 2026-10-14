@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { Message, useLocale } from "../i18n/locale";
+import type { UiMessage } from "../i18n/messages";
 import type { SessionSummary } from "../lib/types";
 
 type Props = {
   readonly session: SessionSummary;
   readonly pending: boolean;
-  readonly error: string | null;
+  readonly error: UiMessage | null;
   readonly onCancel: () => void;
   readonly onConfirm: (title: string) => void;
 };
 
 export function RenameDialog({ session, pending, error, onCancel, onConfirm }: Props) {
+  const { t } = useLocale();
   const [title, setTitle] = useState(session.title);
   const panel = useRef<HTMLFormElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -60,11 +63,9 @@ export function RenameDialog({ session, pending, error, onCancel, onConfirm }: P
           }
         }}
       >
-        <h2 id="rename-title">Rename session</h2>
-        <p id="rename-description">
-          Update this session's title in OpenCode. Conversation history stays unchanged.
-        </p>
-        <label htmlFor="rename-input">Session title</label>
+        <h2 id="rename-title">{t("rename")}</h2>
+        <p id="rename-description">{t("renameExplanation")}</p>
+        <label htmlFor="rename-input">{t("sessionTitle")}</label>
         <input
           ref={input}
           id="rename-input"
@@ -74,18 +75,18 @@ export function RenameDialog({ session, pending, error, onCancel, onConfirm }: P
           aria-invalid={!title.trim()}
           onChange={(event) => setTitle(event.target.value)}
         />
-        {!title.trim() && <p id="rename-validation">Enter a nonempty session title.</p>}
+        {!title.trim() && <p id="rename-validation">{t("titleRequired")}</p>}
         {error && (
           <p className="error" role="alert">
-            {error}
+            <Message message={error} />
           </p>
         )}
         <div className="dialog-actions">
           <button type="button" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </button>
           <button type="submit" className="primary" disabled={pending || !title.trim()}>
-            {pending ? "Saving..." : "Save title"}
+            {t(pending ? "saving" : "saveTitle")}
           </button>
         </div>
       </form>

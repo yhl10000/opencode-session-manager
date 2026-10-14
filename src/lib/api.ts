@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { z } from "zod";
+import type { MessageKey, UiMessage } from "../i18n/messages";
 import { catalogSchema, deleteResultSchema, detailSchema, type LaunchMode } from "./types";
 
 export function isDesktop(): boolean {
@@ -19,17 +20,39 @@ export const api = {
     return detailSchema.parse(await invoke<unknown>("get_session_detail", { sessionId }));
   },
   async launchSession(sessionId: string, mode: LaunchMode) {
-    return z.string().parse(await invoke<unknown>("launch_session", { sessionId, mode }));
+    const receipt = z.string().parse(await invoke<unknown>("launch_session", { sessionId, mode }));
+    const nativeReceipt = receipt.match(
+      /^Dispatched Windows Terminal launch request for (\S+) \(dispatcher PID (\d+)\)\. Session loading and TUI readiness are not confirmed\.$/,
+    );
+    return nativeReceipt ? `${nativeReceipt[1]} / PID ${nativeReceipt[2]}` : receipt;
   },
   async openDirectory(sessionId: string): Promise<void> {
     await invoke("open_directory", { sessionId });
   },
 };
 
-export function errorMessage(error: unknown): string {
-  if (error instanceof z.ZodError)
-    return "The desktop returned an invalid response. Refresh or restart the app.";
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "The desktop request failed. Try again.";
+const nativeErrors: readonly (readonly [string, MessageKey])[] = [
+  ["Cannot read OpenCode database (unsupported schema or unavailable file):", "databaseError"],
+  ["Cannot execute native command:", "commandError"],
+  ["Required executable not found:", "executableError"],
+  ["Unsupported PowerShell executable path containing ';':", "powershellPathError"],
+  ["OpenCode discovery failed:", "discoveryError"],
+  ["Session is not present in the OpenCode database:", "missingSessionError"],
+  ["Invalid session ID:", "invalidSessionError"],
+  ["Session directory does not exist:", "directoryError"],
+  ["Deletion refused:", "deletionError"],
+  ["Deletion stopped", "deletionError"],
+  ["Session rename failed:", "renameError"],
+  ["Application is closing; session mutations are no longer accepted", "closingError"],
+  ["Mutation state is unavailable. Restart the app.", "mutationError"],
+];
+export function errorMessage(error: unknown): UiMessage {
+  if (error instanceof z.ZodError) return { key: "invalidResponse", detail: error.message };
+  const detail = error instanceof Error ? error.message : typeof error === "string" ? error : null;
+  if (detail !== null)
+    return {
+      key: nativeErrors.find(([prefix]) => detail.startsWith(prefix))?.[1] ?? "actionError",
+      detail,
+    };
+  return { key: "requestFailed" };
 }

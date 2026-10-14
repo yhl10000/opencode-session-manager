@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
+import type { UiMessage } from "../i18n/messages";
 import { api, errorMessage } from "../lib/api";
 import type { LaunchMode } from "../lib/types";
 
 export type SessionAction = LaunchMode | "copy" | "directory";
-export type Notice = { readonly text: string; readonly error: boolean };
+export type Notice = { readonly message: UiMessage; readonly error: boolean };
 
 export function useActions() {
   const [pending, setPending] = useState<string | null>(null);
@@ -20,22 +21,22 @@ export function useActions() {
         case "window": {
           const receipt = await api.launchSession(sessionId, action);
           setNotice({
-            text: `Launch request dispatched: ${receipt}. Check Windows Terminal; session resume is not confirmed.`,
+            message: { key: "launchReceipt", values: { receipt } },
             error: false,
           });
           break;
         }
         case "copy":
           await navigator.clipboard.writeText(sessionId);
-          setNotice({ text: "Session ID copied to clipboard.", error: false });
+          setNotice({ message: { key: "copied" }, error: false });
           break;
         case "directory":
           await api.openDirectory(sessionId);
-          setNotice({ text: "Directory open request sent to Windows Explorer.", error: false });
+          setNotice({ message: { key: "directorySent" }, error: false });
           break;
       }
     } catch (error) {
-      setNotice({ text: errorMessage(error), error: true });
+      setNotice({ message: errorMessage(error), error: true });
     } finally {
       busy.current = false;
       setPending(null);
