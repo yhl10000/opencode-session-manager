@@ -121,7 +121,7 @@ jobs:
             throw 'A release already exists for this tag; refusing to overwrite it.'
           }
           $notes = 'Windows x64 NSIS installer (unsigned). Windows SmartScreen may warn; verify the source and SHA256SUMS.txt before installing. Requires Windows 11, WebView2 Runtime, PowerShell 7, Windows Terminal, and OpenCode CLI on PATH. The installer uses the default WebView2 download bootstrapper when needed; PowerShell, Windows Terminal, and OpenCode are not bundled. CI uses synthetic fixtures and does not verify interactive OpenCode TUI behavior.'
-          gh release create "$env:RELEASE_TAG" "release-assets/$installer" "release-assets/SHA256SUMS.txt" --verify-tag --title "OpenCode Session Manager $env:RELEASE_TAG" --notes "$notes" --draft
+          gh release create "$env:RELEASE_TAG" "release-assets/$installer" "release-assets/SHA256SUMS.txt" --verify-tag --title "$env:RELEASE_TAG" --notes "$notes" --draft
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           gh release edit "$env:RELEASE_TAG" --draft=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
