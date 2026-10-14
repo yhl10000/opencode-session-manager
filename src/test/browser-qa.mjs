@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { chromium } from "@playwright/test";
+import { installFixture } from "./browser-fixture.mjs";
 
 const baseURL = process.env.SESSION_MANAGER_QA_URL ?? "http://127.0.0.1:1420";
 const evidence = join(tmpdir(), "opencode");
@@ -32,106 +33,15 @@ try {
   await page.goto(baseURL);
   await page.getByText("Desktop app required").waitFor();
   await page.screenshot({ path: join(evidence, "session-manager-desktop-required.png") });
-  await page.addInitScript(() => {
-    const now = Date.now();
-    const projects = [
-      { id: "engine", name: "Runtime Engine", path: "Q:\\workspace\\runtime-engine" },
-      { id: "studio", name: "Developer Studio", path: "Q:\\workspace\\developer-studio" },
-      { id: "empty", name: "Notes", path: "Q:\\workspace\\notes" },
-    ];
-    const sessions = projects.slice(0, 2).flatMap((project, group) =>
-      Array.from({ length: group === 0 ? 45 : 23 }, (_, index) => ({
-        id: `ses_${project.id}_${index}`,
-        projectId: project.id,
-        title:
-          index === 0
-            ? group === 0
-              ? "Refine the session dispatch pipeline"
-              : "调整开发工作区的布局"
-            : [
-                "Trace cancellation in the worker pool",
-                "Review filesystem boundaries",
-                "Simplify the catalog query",
-                "Add regression coverage",
-                "Investigate startup latency",
-              ][index % 5],
-        directory: project.path,
-        createdAt: now - (index + 20) * 3600000,
-        updatedAt: now - (index + group * 6) * 3600000,
-        messageCount: 6 + index,
-        model: index % 3 === 0 ? null : "gpt-5.1-codex",
-        provider: index % 3 === 0 ? null : "github-copilot",
-        tokens: index % 3 === 0 ? null : 18400 + index,
-        parentId: index % 4 === 0 ? "ses_parent" : null,
-      })),
-    );
-    window.__QA_CALLS__ = [];
-    window.__QA_FAILURE__ = null;
-    window.__QA_DELETED__ = [];
-    window.__TAURI_INTERNALS__ = {
-      invoke: async (command, args = {}) => {
-        window.__QA_CALLS__.push({ command, args });
-        if (window.__QA_FAILURE__ === command)
-          throw new Error("Test desktop unavailable. Retry the request.");
-        switch (command) {
-          case "get_catalog":
-            return {
-              databasePath: "Q:\\test-only\\opencode.db",
-              opencodeVersion: "1.19.0",
-              projects: projects.filter((project) =>
-                sessions.some(
-                  (item) =>
-                    item.projectId === project.id && !window.__QA_DELETED__.includes(item.id),
-                ),
-              ),
-              sessions: sessions.filter((item) => !window.__QA_DELETED__.includes(item.id)),
-            };
-          case "get_session_detail":
-            return {
-              session: sessions.find((item) => item.id === args.sessionId),
-              preview: [
-                {
-                  id: "m1",
-                  role: "user",
-                  text: "Review the session launcher. Keep tab and window dispatch independent, and preserve the working directory as a literal path.",
-                  createdAt: now - 420000,
-                },
-                {
-                  id: "m2",
-                  role: "assistant",
-                  text: "The launcher boundary now receives a session ID and an explicit mode.\n\nNext checks\n  1. Verify Windows Terminal arguments.\n  2. Confirm stale detail requests cannot replace the selected session.\n\n路径与会话文本只在本机显示，不发送到外部服务。\n\n<script>alert('plain text only')</script>",
-                  createdAt: now - 300000,
-                },
-              ],
-              previewTruncated: true,
-            };
-          case "launch_session":
-            return `test dispatch receipt (${args.mode})`;
-          case "open_directory":
-            return null;
-          case "delete_sessions": {
-            window.__QA_DELETED__.push(...args.sessionIds);
-            const remaining = sessions.filter((item) => !window.__QA_DELETED__.includes(item.id));
-            return {
-              catalog: {
-                databasePath: "Q:\\test-only\\opencode.db",
-                opencodeVersion: "1.0.0",
-                projects: projects.filter((project) =>
-                  remaining.some((item) => item.projectId === project.id),
-                ),
-                sessions: remaining,
-              },
-              deletedIds: args.sessionIds,
-              errors: [],
-            };
-          }
-          default:
-            throw new Error(`Unexpected QA command ${command}`);
-        }
-      },
-    };
-  });
+  await page.addInitScript(installFixture);
   await page.reload();
+  await page.getByRole("checkbox", { name: "Show child sessions" }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).count(),
+    0,
+  );
+  await page.screenshot({ path: join(evidence, "session-manager-children-hidden.png") });
+  await page.getByRole("checkbox", { name: "Show child sessions" }).check();
   await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).waitFor();
   assert.equal(
     await page.evaluate(
@@ -155,6 +65,50 @@ try {
   assert.equal(refreshedCalls.length, detailCalls + 1);
   assert.equal(refreshedCalls.at(-1).args.sessionId, "ses_engine_0");
   await page.screenshot({ path: join(evidence, "session-manager-detail.png") });
+  await page
+    .getByRole("button", { name: "Pin session Refine the session dispatch pipeline" })
+    .click();
+  await page.locator('.project-group[aria-label="Runtime Engine"] .row-pin').nth(2).click();
+  assert.equal(await page.locator('.row-pin[aria-pressed="true"]').count(), 2);
+  await page
+    .getByRole("button", { name: "Actions for Refine the session dispatch pipeline" })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename session" }).click();
+  await page.getByRole("textbox", { name: "Session title" }).fill("   ");
+  assert.equal(await page.getByRole("button", { name: "Save title" }).isEnabled(), false);
+  await page.getByRole("textbox", { name: "Session title" }).fill("  Renamed dispatch pipeline  ");
+  await page.evaluate(() => {
+    window.__QA_FAILURE__ = "rename_session";
+  });
+  await page.getByRole("button", { name: "Save title" }).click();
+  await page.getByRole("alert").filter({ hasText: "Test desktop unavailable" }).waitFor();
+  await page.screenshot({ path: join(evidence, "session-manager-rename-error.png") });
+  await page.evaluate(() => {
+    window.__QA_FAILURE__ = null;
+  });
+  await page.getByRole("button", { name: "Save title" }).click();
+  await page.getByRole("heading", { name: "Renamed dispatch pipeline" }).waitFor();
+  await page.getByRole("button", { name: "Actions for Renamed dispatch pipeline" }).click();
+  await page.getByRole("menuitem", { name: "Rename session" }).click();
+  await page
+    .getByRole("textbox", { name: "Session title" })
+    .fill("Refine the session dispatch pipeline");
+  await page.getByRole("button", { name: "Save title" }).click();
+  await page.getByRole("heading", { name: "Refine the session dispatch pipeline" }).waitFor();
+  await page.getByRole("checkbox", { name: "Show child sessions" }).uncheck();
+  await page.getByRole("heading", { name: "Pick up where you left off" }).waitFor();
+  await page.getByRole("button", { name: "Delete project Runtime Engine" }).click();
+  assert((await page.getByRole("dialog").textContent()).includes("12 hidden child sessions"));
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.reload();
+  assert.equal(
+    await page.getByRole("checkbox", { name: "Show child sessions" }).isChecked(),
+    false,
+  );
+  await page.getByRole("checkbox", { name: "Show child sessions" }).check();
+  assert.equal(await page.locator('.row-pin[aria-pressed="true"]').count(), 2);
+  await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).click();
+  await page.getByText("Preview truncated.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Open in tab", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Launch request dispatched" }).waitFor();
   await page.getByRole("button", { name: "Open in window", exact: true }).click();
@@ -168,8 +122,7 @@ try {
     .click({ button: "right" });
   await page.getByRole("menu").waitFor();
   await page.screenshot({ path: join(evidence, "session-manager-menu.png") });
-  await page.keyboard.press("End");
-  await page.keyboard.press("Enter");
+  await page.getByRole("menuitem", { name: "Open directory" }).click();
   await page.getByText("Directory open request sent to Windows Explorer.").waitFor();
   await page.getByRole("button", { name: "Dismiss notification" }).click();
   await page.getByRole("button", { name: "Load 20 more 25 remaining" }).click();
@@ -241,6 +194,20 @@ try {
       await page.locator(".detail-scroll").evaluate((element) => {
         element.scrollTop = 0;
       });
+      await page
+        .getByRole("button", { name: "Actions for Refine the session dispatch pipeline" })
+        .click();
+      await page.getByRole("menuitem", { name: "Rename session" }).click();
+      await page.screenshot({
+        path: join(evidence, `session-manager-rename-${width}-${colorScheme}.png`),
+      });
+      assert.equal(
+        await page
+          .getByRole("textbox", { name: "Session title" })
+          .evaluate((element) => element === document.activeElement),
+        true,
+      );
+      await page.keyboard.press("Escape");
     }
   }
   const calls = await page.evaluate(() => window.__QA_CALLS__);
@@ -269,17 +236,7 @@ try {
   assert.equal(await page.locator('.project-group[aria-label="Developer Studio"]').count(), 0);
   assert.equal(await page.evaluate(() => window.__QA_DELETED__.length), 23);
   console.log(
-    JSON.stringify(
-      {
-        result: "PASS",
-        screenshots: evidence,
-        widths: [390, 1440, 1920],
-        calls: calls.length,
-        browserErrors: errors,
-      },
-      null,
-      2,
-    ),
+    `PASS: widths 390/1440/1920; ${errors.length} browser errors; screenshots: ${evidence}`,
   );
 } finally {
   await context.close();
