@@ -2,10 +2,20 @@ import { z } from "zod";
 
 const KEY = "opencode-session-manager.preferences";
 const schema = z
-  .object({ sort: z.enum(["activity", "name"]), collapsed: z.array(z.string()).max(10000) })
+  .object({
+    sort: z.enum(["activity", "name"]),
+    collapsed: z.array(z.string()).max(10000).readonly(),
+    showChildSessions: z.boolean().default(false),
+    pinnedSessionIds: z.array(z.string()).max(10000).readonly().default([]),
+  })
   .readonly();
 export type Preferences = z.infer<typeof schema>;
-const defaults: Preferences = { sort: "activity", collapsed: [] };
+const defaults: Preferences = {
+  sort: "activity",
+  collapsed: [],
+  showChildSessions: false,
+  pinnedSessionIds: [],
+};
 
 export function readPreferences(): {
   readonly value: Preferences;
