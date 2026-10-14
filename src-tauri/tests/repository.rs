@@ -33,7 +33,7 @@ fn incompatible_schema_is_reported() {
 }
 
 #[test]
-fn catalog_preserves_real_projects_and_groups_global_directories() {
+fn catalog_groups_all_sessions_by_their_working_directories() {
     let (_temp, repo) = fixture().unwrap();
 
     let catalog = repo.catalog().unwrap();
@@ -46,12 +46,12 @@ fn catalog_preserves_real_projects_and_groups_global_directories() {
             .collect::<Vec<_>>(),
         ["ses_c", "ses_b", "ses_a"]
     );
-    assert_eq!(catalog.sessions[0].project_id, "git");
+    assert_eq!(catalog.sessions[0].project_id, "directory:q:/git/sub");
     assert_eq!(
         catalog.sessions[1].project_id,
         catalog.sessions[2].project_id
     );
-    assert!(catalog.projects.iter().any(|p| p.id == "empty"));
+    assert_eq!(catalog.projects.len(), 2);
     assert_eq!(catalog.sessions[2].message_count, 45);
     assert_eq!(catalog.sessions[2].model.as_deref(), Some("model-x"));
     assert_eq!(catalog.sessions[2].provider.as_deref(), Some("provider-x"));

@@ -1,7 +1,7 @@
 use crate::{
-    dto::{Catalog, Project, SessionDetail, SessionSummary},
+    dto::{Catalog, SessionDetail, SessionSummary},
     error::{BackendError, Result},
-    grouping::{directory_name, group_global},
+    grouping::group_directories,
     preview,
 };
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Row};
@@ -49,7 +49,6 @@ impl Repository {
     pub fn catalog(&self) -> Result<Catalog> {
         let mut db = self.connect()?;
         let transaction = db.transaction()?;
-        let mut projects = read_projects(&transaction)?;
         let sql = format!("WITH counts AS (SELECT session_id,count(*) amount FROM message GROUP BY session_id)
             SELECT {SESSION_FIELDS} FROM session s LEFT JOIN counts ON counts.session_id=s.id ORDER BY s.time_updated DESC,s.id DESC");
         let mut sessions = transaction
@@ -59,7 +58,7 @@ impl Repository {
         for session in &mut sessions {
             supplement_model(&transaction, session)?;
         }
-        group_global(&mut projects, &mut sessions);
+        let projects = group_directories(&mut sessions);
         Ok(Catalog {
             database_path: self.path.to_string_lossy().into_owned(),
             opencode_version: self.version.clone(),
@@ -72,8 +71,7 @@ impl Repository {
         let mut db = self.connect()?;
         let transaction = db.transaction()?;
         let mut session = read_session(&transaction, id)?;
-        let mut projects = read_projects(&transaction)?;
-        group_global(&mut projects, std::slice::from_mut(&mut session));
+        group_directories(std::slice::from_mut(&mut session));
         let (preview, preview_truncated) = preview::read(&transaction, &session)?;
         Ok(SessionDetail {
             session,
@@ -85,23 +83,6 @@ impl Repository {
     pub fn session(&self, id: &str) -> Result<SessionSummary> {
         read_session(&self.connect()?, id)
     }
-}
-
-fn read_projects(db: &Connection) -> Result<Vec<Project>> {
-    Ok(db
-        .prepare("SELECT id,worktree,name FROM project ORDER BY id")?
-        .query_map([], |row| {
-            let path: String = row.get(1)?;
-            let name: Option<String> = row.get(2)?;
-            Ok(Project {
-                id: row.get(0)?,
-                name: name
-                    .filter(|n| !n.is_empty())
-                    .unwrap_or_else(|| directory_name(&path)),
-                path,
-            })
-        })?
-        .collect::<std::result::Result<Vec<_>, _>>()?)
 }
 
 fn read_session(db: &Connection, id: &str) -> Result<SessionSummary> {
