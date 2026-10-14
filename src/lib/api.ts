@@ -12,6 +12,9 @@ export const api = {
   async deleteSessions(sessionIds: readonly string[]) {
     return deleteResultSchema.parse(await invoke<unknown>("delete_sessions", { sessionIds }));
   },
+  async renameSession(sessionId: string, title: string) {
+    return catalogSchema.parse(await invoke<unknown>("rename_session", { sessionId, title }));
+  },
   async getSessionDetail(sessionId: string) {
     return detailSchema.parse(await invoke<unknown>("get_session_detail", { sessionId }));
   },

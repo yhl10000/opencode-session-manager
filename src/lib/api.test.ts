@@ -29,3 +29,16 @@ it("recognizes a plain browser as desktop unavailable", () => {
   Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   expect(isDesktop()).toBe(false);
 });
+
+it("renames through the exact IPC contract and validates the returned catalog", async () => {
+  invoke.mockResolvedValue(catalog);
+
+  expect(await api.renameSession("ses_a", "Renamed")).toEqual(catalog);
+  expect(invoke).toHaveBeenCalledWith("rename_session", { sessionId: "ses_a", title: "Renamed" });
+});
+
+it("rejects a malformed rename response instead of applying it", async () => {
+  invoke.mockResolvedValue({ sessions: [] });
+
+  await expect(api.renameSession("ses_a", "Renamed")).rejects.toThrow();
+});
