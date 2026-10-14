@@ -1,37 +1,38 @@
 import { strict as assert } from "node:assert";
-import { spawn } from "node:child_process";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripVTControlCharacters } from "node:util";
 import { chromium } from "@playwright/test";
 import { installFixture } from "./browser-fixture.mjs";
+import { localizedPage } from "./qa-locale.mjs";
+import { captureMatrix } from "./qa-matrix.mjs";
+import { startPreview } from "./qa-server.mjs";
 
 const baseURL = process.env.SESSION_MANAGER_QA_URL ?? "http://127.0.0.1:1420";
-const evidence = join(tmpdir(), "opencode");
-const server = spawn(
-  process.execPath,
-  ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", "1420", "--strictPort"],
-  { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, FORCE_COLOR: "0" } },
-);
-server.stderr.on("data", (data) => process.stderr.write(data));
-await new Promise((resolve, reject) => {
-  server.stdout.on("data", (data) => {
-    if (stripVTControlCharacters(data.toString()).includes("http://127.0.0.1:1420")) resolve();
-  });
-  server.on("error", reject);
-  server.on("exit", (code) => reject(new Error(`QA server exited ${code}`)));
-});
+const locale = process.env.SESSION_MANAGER_QA_LOCALE ?? "en";
+assert(["en", "zh-CN"].includes(locale));
+const evidence = await mkdtemp(join(tmpdir(), `session-manager-${locale}-`));
+const server = await startPreview();
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 const errors = [];
 const context = await browser.newContext({
+  locale: locale === "en" ? "en-US" : "zh-TW",
   viewport: { width: 1440, height: 900 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
-const page = await context.newPage();
+const rawPage = await context.newPage();
+const page = localizedPage(rawPage, locale);
 page.on("pageerror", (error) => errors.push(error.message));
 try {
   await page.goto(baseURL);
   await page.getByText("Desktop app required").waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), locale);
+  const other = locale === "en" ? "zh-CN" : "en";
+  await page.locator(".language-selector select").selectOption(other);
+  assert.equal(await page.locator("html").getAttribute("lang"), other);
+  await page.locator(".language-selector select").selectOption(locale);
+  await page.reload();
+  assert.equal(await page.locator(".language-selector select").inputValue(), locale);
   await page.screenshot({ path: join(evidence, "session-manager-desktop-required.png") });
   await page.addInitScript(installFixture);
   await page.reload();
@@ -53,7 +54,12 @@ try {
   await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).click();
   await page.getByText("Preview truncated.", { exact: false }).waitFor();
   assert.equal(await page.locator(".preview script").count(), 0);
-  assert(await page.locator(".row-meta").getByText("18.4K tokens", { exact: true }).count());
+  assert(
+    await page
+      .locator(".row-meta")
+      .getByText(locale === "en" ? "18.4K tokens" : "1.8万 个 token", { exact: true })
+      .count(),
+  );
   const detailCalls = await page.evaluate(
     () => window.__QA_CALLS__.filter((call) => call.command === "get_session_detail").length,
   );
@@ -65,6 +71,15 @@ try {
   assert.equal(refreshedCalls.length, detailCalls + 1);
   assert.equal(refreshedCalls.at(-1).args.sessionId, "ses_engine_0");
   await page.screenshot({ path: join(evidence, "session-manager-detail.png") });
+  const detailBeforeSwitch = await page.evaluate(() => window.__QA_CALLS__.length);
+  await page.locator(".language-selector select").selectOption(other);
+  assert.equal(await page.locator(".session-select[aria-pressed='true']").count(), 1);
+  assert.equal(
+    await page.getByRole("heading", { name: "Refine the session dispatch pipeline" }).count(),
+    1,
+  );
+  assert.equal(await page.evaluate(() => window.__QA_CALLS__.length), detailBeforeSwitch);
+  await page.locator(".language-selector select").selectOption(locale);
   await page
     .getByRole("button", { name: "Pin session Refine the session dispatch pipeline" })
     .click();
@@ -98,7 +113,11 @@ try {
   await page.getByRole("checkbox", { name: "Show child sessions" }).uncheck();
   await page.getByRole("heading", { name: "Pick up where you left off" }).waitFor();
   await page.getByRole("button", { name: "Delete project Runtime Engine" }).click();
-  assert((await page.getByRole("dialog").textContent()).includes("12 hidden child sessions"));
+  assert(
+    (await page.getByRole("dialog").textContent()).includes(
+      locale === "en" ? "12 hidden child sessions" : "12 个隐藏的子会话",
+    ),
+  );
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.reload();
   assert.equal(
@@ -110,7 +129,10 @@ try {
   await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).click();
   await page.getByText("Preview truncated.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Open in tab", exact: true }).click();
-  await page.getByRole("status").filter({ hasText: "Launch request dispatched" }).waitFor();
+  await page
+    .getByRole("status")
+    .filter({ hasText: locale === "en" ? "Launch request dispatched" : "启动请求已发送" })
+    .waitFor();
   await page.getByRole("button", { name: "Open in window", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "(window)" }).waitFor();
   await page.getByRole("button", { name: "Copy session ID", exact: true }).click();
@@ -125,7 +147,11 @@ try {
   await page.getByRole("menuitem", { name: "Open directory" }).click();
   await page.getByText("Directory open request sent to Windows Explorer.").waitFor();
   await page.getByRole("button", { name: "Dismiss notification" }).click();
-  await page.getByRole("button", { name: "Load 20 more 25 remaining" }).click();
+  await rawPage
+    .getByRole("button", {
+      name: locale === "en" ? "Load 20 more 25 remaining" : "再加载 20 个 剩余 25 个",
+    })
+    .click();
   assert.equal(
     await page.locator('.project-group[aria-label="Runtime Engine"] .session-row').count(),
     40,
@@ -170,46 +196,7 @@ try {
   });
   await page.getByRole("button", { name: "Retry refresh" }).click();
   await page.getByText("Refresh failed.", { exact: false }).waitFor({ state: "hidden" });
-  for (const width of [390, 1440, 1920]) {
-    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    for (const colorScheme of ["dark", "light"]) {
-      await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
-      await page.screenshot({
-        path: join(evidence, `session-manager-${width}-${colorScheme}.png`),
-      });
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
-      assert.equal(overflow, false, `Horizontal overflow at ${width}`);
-      await page.locator(".explorer-scroll").evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-      });
-      await page.locator(".detail-scroll").evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-      });
-      await page.screenshot({
-        path: join(evidence, `session-manager-${width}-${colorScheme}-end.png`),
-      });
-      await page.locator(".explorer-scroll").evaluate((element) => {
-        element.scrollTop = 0;
-      });
-      await page.locator(".detail-scroll").evaluate((element) => {
-        element.scrollTop = 0;
-      });
-      await page
-        .getByRole("button", { name: "Actions for Refine the session dispatch pipeline" })
-        .click();
-      await page.getByRole("menuitem", { name: "Rename session" }).click();
-      await page.screenshot({
-        path: join(evidence, `session-manager-rename-${width}-${colorScheme}.png`),
-      });
-      assert.equal(
-        await page
-          .getByRole("textbox", { name: "Session title" })
-          .evaluate((element) => element === document.activeElement),
-        true,
-      );
-      await page.keyboard.press("Escape");
-    }
-  }
+  await captureMatrix(page, evidence);
   const calls = await page.evaluate(() => window.__QA_CALLS__);
   assert(calls.some((call) => call.command === "launch_session" && call.args.mode === "tab"));
   assert(calls.some((call) => call.command === "launch_session" && call.args.mode === "window"));
@@ -236,7 +223,7 @@ try {
   assert.equal(await page.locator('.project-group[aria-label="Developer Studio"]').count(), 0);
   assert.equal(await page.evaluate(() => window.__QA_DELETED__.length), 23);
   console.log(
-    `PASS: widths 390/1440/1920; ${errors.length} browser errors; screenshots: ${evidence}`,
+    `PASS: ${locale}; widths 390/1440/1920; ${errors.length} browser errors; screenshots: ${evidence}`,
   );
 } finally {
   await context.close();
