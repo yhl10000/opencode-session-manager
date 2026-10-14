@@ -52,6 +52,13 @@ export const detailSchema = z
 export type Project = z.infer<typeof projectSchema>;
 export type SessionSummary = z.infer<typeof sessionSchema>;
 export type Catalog = z.infer<typeof catalogSchema>;
+export const deleteResultSchema = z
+  .object({
+    catalog: catalogSchema,
+    deletedIds: z.array(z.string()).readonly(),
+    errors: z.array(z.string()).readonly(),
+  })
+  .readonly();
 export type SessionDetail = z.infer<typeof detailSchema>;
 export type PreviewMessage = SessionDetail["preview"][number];
 export type SortOrder = "activity" | "name";

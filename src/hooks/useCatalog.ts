@@ -28,5 +28,11 @@ export function useCatalog() {
       generation.current++;
     };
   }, [refresh]);
-  return { desktop, catalog, loading, error, refresh };
+  const replaceCatalog = useCallback((data: Catalog) => {
+    generation.current++;
+    setCatalog(data);
+    setLoading(false);
+    setError(null);
+  }, []);
+  return { desktop, catalog, loading, error, refresh, replaceCatalog };
 }

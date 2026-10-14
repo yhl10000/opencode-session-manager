@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { z } from "zod";
-import { catalogSchema, detailSchema, type LaunchMode } from "./types";
+import { catalogSchema, deleteResultSchema, detailSchema, type LaunchMode } from "./types";
 
 export function isDesktop(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -8,6 +8,9 @@ export function isDesktop(): boolean {
 export const api = {
   async getCatalog() {
     return catalogSchema.parse(await invoke<unknown>("get_catalog"));
+  },
+  async deleteSessions(sessionIds: readonly string[]) {
+    return deleteResultSchema.parse(await invoke<unknown>("delete_sessions", { sessionIds }));
   },
   async getSessionDetail(sessionId: string) {
     return detailSchema.parse(await invoke<unknown>("get_session_detail", { sessionId }));
