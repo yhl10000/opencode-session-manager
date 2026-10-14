@@ -21,7 +21,9 @@ fn encoded_script_keeps_unicode_and_metacharacters_literal() {
     assert!(args.iter().all(|argument| !argument.contains(';')));
     let bytes = STANDARD.decode(args.last().unwrap()).unwrap();
     let units = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
         .collect::<Vec<_>>();
     let script = String::from_utf16(&units).unwrap();
