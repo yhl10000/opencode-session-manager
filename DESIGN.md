@@ -45,7 +45,7 @@ At narrow widths, the panes stack vertically. The explorer remains bounded so th
 
 ## Components and behavior
 
-- **Explorer:** Search across project name, title, ID, path, model, and provider. Every whitespace-separated, case-insensitive query term must match. Sort by activity or project name. Groups are independently collapsible and reveal sessions incrementally. Search expands matching groups without overwriting saved collapsed-group preferences.
+- **Explorer:** Group by recorded session working directory and use folder names as headings, with full paths to distinguish duplicates. Ignore database project display names. Groups are independently collapsible; the header also offers Collapse all projects without resetting selection or pagination. Search expands matching groups without overwriting saved collapsed-group preferences and disables bulk collapse while active. Search across folder name, title, ID, path, model, and provider. Sort by activity or folder name.
 - **Session row:** A native button selects a session and exposes its title, model when available, message count, optional token total, and relative activity time. Double-click requests opening in a terminal tab. Provide an explicit actions button and keyboard access to the contextual menu.
 - **Session menu:** Offer tab and window launch, copy ID, and open working directory. Support keyboard navigation, Escape, outside dismissal, and focus return to the invoking control.
 - **Detail pane:** Show available session metadata and a bounded, read-only plain-text preview. Do not interpret preview content as HTML or Markdown. Fetch detail on selection and avoid replacing newer selection data with a stale response.
@@ -61,5 +61,7 @@ Technical paths and IDs should remain selectable and wrap safely, including CJK 
 Launch feedback means the request was dispatched, not that OpenCode finished loading or is ready for input. Clipboard actions should report whether the copy operation succeeded. On transient refresh failure, retain previously loaded metadata and allow retry.
 
 ## Design tokens and implementation
+
+The explorer header offers Collapse all and Expand all without resetting selection or pagination. Both are disabled during search, whose matching groups stay expanded. Project and session rows have separate right-side delete buttons; project deletion selects the complete directory group, including hidden pages and filtered sessions. A modal confirmation names the target, count and path, states that conversation deletion is permanent and files remain, focuses Cancel initially, traps keyboard focus and blocks repeated confirmation while pending. Partial failures display the actual remaining catalog and keep the error visible.
 
 The canonical CSS variables live in `src/styles/tokens.css`. Keep visual values traceable to those tokens and preserve the keyboard and screen-reader behavior when changing components. For database access, terminal dispatch, and data boundaries, see [Architecture](docs/architecture.md).
