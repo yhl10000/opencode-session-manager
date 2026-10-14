@@ -1,0 +1,25 @@
+@media (max-width: 700px) {
+  .explorer {
+    border-right: 0;
+    border-bottom: var(--line) solid var(--border);
+  }
+  .explorer-toolbar {
+    padding: var(--s3) var(--s4);
+  }
+  .pane-title {
+    margin-bottom: var(--s2);
+  }
+  .explorer-hint {
+    display: none;
+  }
+  .session-select {
+    gap: var(--s2);
+  }
+  .row-meta {
+    gap: var(--s2);
+    flex-wrap: wrap;
+  }
+  .session-select time {
+    max-width: 8ch;
+  }
+}
