@@ -1,0 +1,10 @@
+CREATE TABLE project(id TEXT PRIMARY KEY, worktree TEXT NOT NULL, name TEXT);
+CREATE TABLE session(id TEXT PRIMARY KEY, project_id TEXT, parent_id TEXT, title TEXT, directory TEXT, time_created INTEGER, time_updated INTEGER, model TEXT, tokens_input INTEGER, tokens_output INTEGER, tokens_reasoning INTEGER, tokens_cache_read INTEGER, tokens_cache_write INTEGER);
+CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT);
+CREATE INDEX message_session_time_created_id_idx ON message(session_id,time_created,id);
+CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, data TEXT);
+CREATE INDEX part_message_id_id_idx ON part(message_id,id);
+INSERT INTO project VALUES('global','/',NULL),('git','Q:\git','Git'),('empty','Q:\empty','Empty');
+INSERT INTO session VALUES('ses_a','global',NULL,'A','Q:\Work\Folder',1,10,'{"id":"model-x","providerID":"provider-x"}',0,0,0,0,0),('ses_b','global','ses_a','B','q:/work/folder/',2,20,NULL,10,2,0,0,0),('ses_c','git',NULL,'C','Q:\git\sub',3,30,NULL,NULL,NULL,NULL,NULL,NULL);
+WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<45) INSERT INTO message SELECT 'msg_'||x,'ses_a',x,'{"role":"user"}' FROM n;
+INSERT INTO part SELECT 'part_'||id,id,session_id,time_created,'{"type":"text","text":"hello"}' FROM message;
