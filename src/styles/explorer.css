@@ -19,6 +19,13 @@
 .pane-title h2 {
   font-size: var(--text-md);
 }
+.pane-title .icon-button:first-of-type {
+  margin-left: auto;
+}
+.project-heading {
+  display: flex;
+  align-items: center;
+}
 .count {
   color: var(--muted);
   font-size: var(--text-xs);
@@ -97,6 +104,8 @@
   margin-top: var(--s4);
 }
 .project-header {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   text-align: left;
   justify-content: flex-start;

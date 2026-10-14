@@ -67,6 +67,7 @@ try {
     );
     window.__QA_CALLS__ = [];
     window.__QA_FAILURE__ = null;
+    window.__QA_DELETED__ = [];
     window.__TAURI_INTERNALS__ = {
       invoke: async (command, args = {}) => {
         window.__QA_CALLS__.push({ command, args });
@@ -77,8 +78,13 @@ try {
             return {
               databasePath: "Q:\\test-only\\opencode.db",
               opencodeVersion: "1.19.0",
-              projects,
-              sessions,
+              projects: projects.filter((project) =>
+                sessions.some(
+                  (item) =>
+                    item.projectId === project.id && !window.__QA_DELETED__.includes(item.id),
+                ),
+              ),
+              sessions: sessions.filter((item) => !window.__QA_DELETED__.includes(item.id)),
             };
           case "get_session_detail":
             return {
@@ -103,6 +109,22 @@ try {
             return `test dispatch receipt (${args.mode})`;
           case "open_directory":
             return null;
+          case "delete_sessions": {
+            window.__QA_DELETED__.push(...args.sessionIds);
+            const remaining = sessions.filter((item) => !window.__QA_DELETED__.includes(item.id));
+            return {
+              catalog: {
+                databasePath: "Q:\\test-only\\opencode.db",
+                opencodeVersion: "1.0.0",
+                projects: projects.filter((project) =>
+                  remaining.some((item) => item.projectId === project.id),
+                ),
+                sessions: remaining,
+              },
+              deletedIds: args.sessionIds,
+              errors: [],
+            };
+          }
           default:
             throw new Error(`Unexpected QA command ${command}`);
         }
@@ -172,6 +194,14 @@ try {
     40,
   );
   await page.getByRole("button", { name: /Developer Studio Q:/ }).click();
+  await page.getByRole("button", { name: "Collapse all projects" }).click();
+  assert.equal(await page.locator(".session-row").count(), 0);
+  await page.getByRole("button", { name: /Runtime Engine Q:/ }).click();
+  assert.equal(
+    await page.locator('.project-group[aria-label="Runtime Engine"] .session-row').count(),
+    40,
+  );
+  await page.getByRole("button", { name: /Developer Studio Q:/ }).click();
   await page.getByRole("searchbox").fill("no-match-value");
   await page.getByText("No matching sessions").waitFor();
   await page.screenshot({ path: join(evidence, "session-manager-no-results.png") });
@@ -222,6 +252,22 @@ try {
     ),
   );
   assert.deepEqual(errors, []);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Collapse all projects" }).click();
+  await page.getByRole("button", { name: "Expand all projects" }).click();
+  assert.equal(await page.locator(".session-row").count(), 60);
+  await page
+    .getByRole("button", { name: "Delete session Refine the session dispatch pipeline" })
+    .click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__QA_DELETED__.length), 0);
+  await page.getByRole("button", { name: "Delete project Developer Studio" }).click();
+  await page.getByRole("dialog").waitFor();
+  await page.screenshot({ path: join(evidence, "session-manager-delete-confirm.png") });
+  await page.getByRole("button", { name: "Confirm deletion" }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  assert.equal(await page.locator('.project-group[aria-label="Developer Studio"]').count(), 0);
+  assert.equal(await page.evaluate(() => window.__QA_DELETED__.length), 23);
   console.log(
     JSON.stringify(
       {

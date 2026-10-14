@@ -76,3 +76,35 @@
   color: var(--warning);
   font-size: var(--text-xs);
 }
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: var(--s4);
+  background: #0009;
+}
+.delete-dialog {
+  width: min(520px, 100%);
+  padding: var(--s6);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r3);
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+}
+.delete-dialog p {
+  margin-top: var(--s4);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s3);
+  margin-top: var(--s6);
+}
+.delete-confirm,
+.row-delete {
+  color: var(--error);
+}
