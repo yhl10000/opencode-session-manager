@@ -25,5 +25,6 @@ src-tauri/gen/
 coverage/
 test-results/
 playwright-report/
+release-assets/
 docs/*
 !docs/architecture.md
