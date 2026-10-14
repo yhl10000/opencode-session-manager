@@ -84,6 +84,28 @@ it("reports deletion failure without hiding the session", async () => {
   expect(screen.getByRole("button", { name: "Select Fix routing" })).toBeInTheDocument();
 });
 
+it("discloses hidden children and includes them in a filtered project deletion", async () => {
+  const sessions = [session(), session({ id: "child", title: "Hidden child", parentId: "ses_a" })];
+  invoke.mockResolvedValue({ ...catalog, sessions });
+  render(<App />);
+  await screen.findByRole("button", { name: "Select Fix routing" });
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Fix routing" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete project Alpha" }));
+
+  expect(screen.getByRole("dialog")).toHaveTextContent("2 sessions");
+  expect(screen.getByRole("dialog")).toHaveTextContent("1 hidden child sessions");
+  invoke.mockResolvedValue({
+    catalog: { ...catalog, projects: [], sessions: [] },
+    deletedIds: ["ses_a", "child"],
+    errors: [],
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("delete_sessions", { sessionIds: ["ses_a", "child"] }),
+  );
+});
+
 it("returns keyboard focus to confirmation when an outside control receives focus", async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Delete session Fix routing" }));
@@ -92,4 +114,40 @@ it("returns keyboard focus to confirmation when an outside control receives focu
   screen.getByRole("searchbox").focus();
 
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+});
+
+it("discloses children hidden by search even when child visibility is enabled", async () => {
+  localStorage.setItem(
+    "opencode-session-manager.preferences",
+    JSON.stringify({ sort: "activity", collapsed: [], showChildSessions: true }),
+  );
+  invoke.mockResolvedValue({
+    ...catalog,
+    sessions: [session(), session({ id: "child", title: "Other", parentId: "ses_a" })],
+  });
+  render(<App />);
+  await screen.findByRole("button", { name: "Select Fix routing" });
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Fix routing" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete project Alpha" }));
+
+  expect(screen.getByRole("dialog")).toHaveTextContent("1 hidden child sessions");
+});
+
+it("clears a deleted selection rather than restoring it when a later catalog contains the ID", async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Select Fix routing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete session Fix routing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Select Fix routing" })).not.toBeInTheDocument(),
+  );
+  invoke.mockResolvedValue(catalog);
+
+  fireEvent.click(screen.getByRole("button", { name: "Refresh sessions" }));
+
+  expect(await screen.findByRole("button", { name: "Select Fix routing" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
 });

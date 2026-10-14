@@ -4,6 +4,7 @@ export type DeleteRequest = {
   readonly label: string;
   readonly path: string;
   readonly ids: readonly string[];
+  readonly hiddenChildCount?: number;
 };
 
 type Props = {
@@ -64,6 +65,9 @@ export function DeleteDialog({ request, pending, error, onCancel, onConfirm }: P
           Permanently delete {request.ids.length} sessions and their conversation history from
           OpenCode. This cannot be undone. Project files and folders will not be deleted.
         </p>
+        {Boolean(request.hiddenChildCount) && (
+          <p>Includes {request.hiddenChildCount} hidden child sessions.</p>
+        )}
         <p className="mono">{request.path}</p>
         {error && (
           <p className="error" role="alert">
