@@ -5,7 +5,7 @@ use crate::{
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{Arc, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 use wait_timeout::ChildExt;
@@ -20,6 +20,7 @@ pub struct Discovery {
 #[derive(Debug, Default)]
 pub struct BackendState {
     discovery: OnceLock<std::result::Result<Arc<Discovery>, String>>,
+    pub deletion_lock: Mutex<()>,
 }
 
 impl BackendState {
@@ -42,7 +43,7 @@ pub fn executable(name: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
-fn metadata_output(program: &Path, args: &[&str]) -> Result<String> {
+pub(crate) fn metadata_output(program: &Path, args: &[&str]) -> Result<String> {
     let mut command = Command::new(program);
     command
         .args(args)
