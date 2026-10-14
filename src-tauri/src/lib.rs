@@ -1,3 +1,4 @@
+pub mod deletion;
 #[cfg(feature = "desktop")]
 pub mod desktop;
 pub mod discovery;

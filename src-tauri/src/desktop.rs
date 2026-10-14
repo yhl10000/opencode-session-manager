@@ -1,6 +1,6 @@
 use crate::{
     discovery::{BackendState, executable},
-    dto::{Catalog, LaunchMode, SessionDetail},
+    dto::{Catalog, DeleteResult, LaunchMode, SessionDetail},
     error::BackendError,
     launcher,
 };
@@ -71,7 +71,24 @@ pub fn run() -> std::result::Result<(), tauri::Error> {
             get_catalog,
             get_session_detail,
             launch_session,
-            open_directory
+            open_directory,
+            delete_sessions
         ])
         .run(tauri::generate_context!())
+}
+
+#[tauri::command]
+async fn delete_sessions(
+    session_ids: Vec<String>,
+    state: State<'_, Arc<BackendState>>,
+) -> std::result::Result<DeleteResult, String> {
+    let state = Arc::clone(state.inner());
+    blocking(move || {
+        let _guard = state.deletion_lock.lock().map_err(|_| {
+            BackendError::Deletion("Deletion state is unavailable. Restart the app.".into())
+        })?;
+        let discovery = state.discovery()?;
+        crate::deletion::delete(&discovery, &session_ids)
+    })
+    .await
 }
