@@ -1,0 +1,52 @@
+[package]
+name = "opencode-session-manager"
+version = "0.1.0"
+edition = "2024"
+description = "Read-only desktop catalog for native OpenCode sessions"
+license = "MIT"
+default-run = "opencode-session-manager"
+
+[lib]
+name = "session_manager"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:ico"]
+
+[dependencies]
+base64 = "0.22"
+rusqlite = { version = "0.38", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+which = "8"
+wait-timeout = "0.2"
+tauri = { version = "2", optional = true , features = [] }
+
+[build-dependencies]
+tauri-build = { version = "2", optional = true , features = [] }
+ico = { version = "0.5", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "opencode-session-manager"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
