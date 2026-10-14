@@ -1,4 +1,4 @@
-import { Check, MessageSquare, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, MessageSquare, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
 import { available, localTime, relativeTime } from "../lib/format";
 import type { SessionSummary } from "../lib/types";
 import type { MenuPosition } from "./SessionMenu";
@@ -11,6 +11,8 @@ type Props = {
   readonly onMenu: (position: MenuPosition) => void;
   readonly onDelete?: ((id: string) => void) | undefined;
   readonly deleting?: boolean | undefined;
+  readonly pinned?: boolean;
+  readonly onTogglePin?: (id: string) => void;
 };
 export function SessionRow({
   session,
@@ -20,6 +22,8 @@ export function SessionRow({
   onMenu,
   onDelete,
   deleting,
+  pinned,
+  onTogglePin,
 }: Props) {
   return (
     <div className={`session-row ${selected ? "selected" : ""}`}>
@@ -80,6 +84,18 @@ export function SessionRow({
           {relativeTime(session.updatedAt)}
         </time>
       </button>
+      {onTogglePin && (
+        <button
+          type="button"
+          className="icon-button row-pin"
+          aria-label={`${pinned ? "Unpin" : "Pin"} session ${session.title || "Untitled session"}`}
+          aria-pressed={Boolean(pinned)}
+          title={pinned ? "Unpin session" : "Pin session in project"}
+          onClick={() => onTogglePin(session.id)}
+        >
+          {pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"

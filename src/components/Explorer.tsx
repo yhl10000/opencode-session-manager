@@ -1,18 +1,10 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  ListCollapse,
-  ListTree,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-import { buildGroups, isExpanded, loadMore, PAGE_SIZE } from "../lib/catalog";
-import { type Preferences, readPreferences, savePreferences } from "../lib/preferences";
+import { ChevronDown, ChevronRight, Folder, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useExplorerView } from "../hooks/useExplorerView";
+import { isExpanded, loadMore, PAGE_SIZE } from "../lib/catalog";
 import type { Catalog } from "../lib/types";
 import type { DeleteRequest } from "./DeleteDialog";
+import { ExplorerToolbar } from "./ExplorerToolbar";
 import type { MenuPosition } from "./SessionMenu";
 import { SessionRow } from "./SessionRow";
 import { StatePanel } from "./StatePanel";
@@ -25,6 +17,11 @@ type Props = {
   readonly onMenu: (position: MenuPosition) => void;
   readonly onDelete?: (request: DeleteRequest) => void;
   readonly deleting?: boolean;
+  readonly onHideChildren?: () => void;
+  readonly onCountsChange?: (counts: {
+    readonly projects: number;
+    readonly sessions: number;
+  }) => void;
 };
 export function Explorer({
   catalog,
@@ -34,96 +31,21 @@ export function Explorer({
   onMenu,
   onDelete,
   deleting,
+  onHideChildren,
+  onCountsChange,
 }: Props) {
-  const [saved] = useState(readPreferences);
-  const [preferences, setPreferences] = useState(saved.value);
-  const [warning, setWarning] = useState(saved.warning);
-  const [query, setQuery] = useState("");
+  const view = useExplorerView(catalog);
+  const { preferences, query, setQuery, groups, update, togglePin, count } = view;
   const [pages, setPages] = useState<Readonly<Record<string, number>>>({});
-  const groups = useMemo(
-    () => buildGroups(catalog, preferences.sort, query),
-    [catalog, preferences.sort, query],
-  );
-  const count = groups.reduce((total, group) => total + group.sessions.length, 0);
-  function update(next: Preferences) {
-    setPreferences(next);
-    setWarning(savePreferences(next));
-  }
+  useEffect(() => {
+    onCountsChange?.({ projects: groups.length, sessions: count });
+  }, [onCountsChange, groups.length, count]);
+  useEffect(() => {
+    if (!preferences.showChildSessions) onHideChildren?.();
+  }, [preferences.showChildSessions, onHideChildren]);
   return (
     <aside className="explorer" aria-label="Project and session explorer">
-      <div className="explorer-toolbar">
-        <div className="pane-title">
-          <h2>Sessions</h2>
-          <span className="count">{catalog.sessions.length.toLocaleString()}</span>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Collapse all projects"
-            title={query.trim() ? "Clear search to collapse all projects" : "Collapse all projects"}
-            disabled={Boolean(query.trim()) || catalog.projects.length === 0}
-            onClick={() =>
-              update({ ...preferences, collapsed: catalog.projects.map((project) => project.id) })
-            }
-          >
-            <ListCollapse aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Expand all projects"
-            title="Expand all projects"
-            disabled={Boolean(query.trim()) || catalog.projects.length === 0}
-            onClick={() => update({ ...preferences, collapsed: [] })}
-          >
-            <ListTree aria-hidden="true" />
-          </button>
-        </div>
-        <label className="search-label" htmlFor="session-search">
-          Search all projects and sessions
-        </label>
-        <div className="search-field">
-          <Search aria-hidden="true" />
-          <input
-            id="session-search"
-            type="search"
-            placeholder="Title, project, ID, path or model"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {query && (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Clear search"
-              onClick={() => setQuery("")}
-            >
-              <X aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        <div className="sort-line">
-          <span>{query.trim() ? `${count} matches` : `${catalog.projects.length} projects`}</span>
-          <label>
-            Sort by{" "}
-            <select
-              aria-label="Sort projects"
-              value={preferences.sort}
-              onChange={(event) => {
-                const sort = event.target.value;
-                if (sort === "activity" || sort === "name") update({ ...preferences, sort });
-              }}
-            >
-              <option value="activity">Latest activity</option>
-              <option value="name">Project name</option>
-            </select>
-          </label>
-        </div>
-        {warning && (
-          <p className="inline-warning" role="status">
-            {warning}
-          </p>
-        )}
-      </div>
+      <ExplorerToolbar catalog={catalog} view={view} />
       <div className="explorer-scroll">
         {groups.map(({ project, sessions }) => {
           const expanded = isExpanded(project.id, preferences.collapsed, query);
@@ -175,6 +97,13 @@ export function Explorer({
                         ids: catalog.sessions
                           .filter((session) => session.projectId === project.id)
                           .map((session) => session.id),
+                        hiddenChildCount: catalog.sessions.filter(
+                          (session) =>
+                            session.projectId === project.id &&
+                            session.parentId !== null &&
+                            (!expanded ||
+                              !sessions.slice(0, visible).some((item) => item.id === session.id)),
+                        ).length,
                       })
                     }
                   >
@@ -192,6 +121,8 @@ export function Explorer({
                       onSelect={onSelect}
                       onLaunch={onLaunch}
                       onMenu={onMenu}
+                      pinned={preferences.pinnedSessionIds.includes(session.id)}
+                      onTogglePin={togglePin}
                       deleting={deleting}
                       onDelete={
                         onDelete
