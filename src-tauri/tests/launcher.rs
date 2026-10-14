@@ -115,6 +115,14 @@ fn powershell_executes_paths_as_literals_without_injected_commands() {
         receipt["arguments"],
         serde_json::json!(["--session", "ses_safe"])
     );
-    assert_eq!(receipt["directory"], target.directory);
+    let receipt_directory = PathBuf::from(receipt["directory"].as_str().unwrap());
+    assert_eq!(
+        std::fs::canonicalize(&receipt_directory).unwrap(),
+        std::fs::canonicalize(&directory).unwrap()
+    );
+    assert_eq!(
+        receipt_directory.file_name().unwrap(),
+        "Unicode 中 O'Brien; Write-Error injected"
+    );
     assert!(output.stderr.is_empty());
 }
