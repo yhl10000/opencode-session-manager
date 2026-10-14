@@ -35,6 +35,14 @@ pub struct Catalog {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DeleteResult {
+    pub catalog: Catalog,
+    pub deleted_ids: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PreviewMessage {
     pub id: String,
     pub role: String,

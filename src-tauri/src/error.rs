@@ -18,6 +18,8 @@ pub enum BackendError {
     InvalidSession(String),
     #[error("Session directory does not exist: {0}")]
     MissingDirectory(String),
+    #[error("Deletion refused: {0}")]
+    Deletion(String),
 }
 
 pub type Result<T> = std::result::Result<T, BackendError>;
