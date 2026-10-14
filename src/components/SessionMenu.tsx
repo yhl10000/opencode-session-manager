@@ -1,4 +1,4 @@
-import { Copy, FolderOpen, PanelTop, SquareArrowOutUpRight } from "lucide-react";
+import { Copy, FolderOpen, PanelTop, Pencil, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SessionAction } from "../hooks/useActions";
 
@@ -13,6 +13,7 @@ type Props = {
   readonly onClose: () => void;
   readonly onAction: (id: string, action: SessionAction) => void;
   readonly disabled: boolean;
+  readonly onRename?: (id: string) => void;
 };
 const items = [
   { action: "tab", label: "Open in tab", Icon: PanelTop },
@@ -21,7 +22,7 @@ const items = [
   { action: "directory", label: "Open directory", Icon: FolderOpen },
 ] as const;
 
-export function SessionMenu({ position, onClose, onAction, disabled }: Props) {
+export function SessionMenu({ position, onClose, onAction, disabled, onRename }: Props) {
   const menu = useRef<HTMLDivElement>(null);
   const [point, setPoint] = useState({ x: position.x, y: position.y });
   useLayoutEffect(() => {
@@ -104,6 +105,22 @@ export function SessionMenu({ position, onClose, onAction, disabled }: Props) {
           {label}
         </button>
       ))}
+      {onRename && (
+        <button
+          type="button"
+          role="menuitem"
+          aria-disabled={disabled}
+          onClick={() => {
+            if (!disabled) {
+              onClose();
+              onRename(position.sessionId);
+            }
+          }}
+        >
+          <Pencil aria-hidden="true" />
+          Rename session
+        </button>
+      )}
     </div>
   );
 }

@@ -1,22 +1,32 @@
 import { AlertCircle, CheckCircle2, Database, RefreshCw, Terminal, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DeleteDialog } from "./components/DeleteDialog";
 import { DetailPanel } from "./components/DetailPanel";
 import { Explorer } from "./components/Explorer";
+import { RenameDialog } from "./components/RenameDialog";
 import { type MenuPosition, SessionMenu } from "./components/SessionMenu";
 import { StatePanel } from "./components/StatePanel";
 import { useActions } from "./hooks/useActions";
 import { useCatalog } from "./hooks/useCatalog";
 import { useDeletion } from "./hooks/useDeletion";
+import { useRename } from "./hooks/useRename";
 
 export function App() {
   const { desktop, catalog, loading, error, refresh, replaceCatalog } = useCatalog();
   const deletion = useDeletion(replaceCatalog);
+  const rename = useRename(replaceCatalog);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuPosition | null>(null);
+  const [counts, setCounts] = useState({ projects: 0, sessions: 0 });
   const closeMenu = useCallback(() => setMenu(null), []);
   const actions = useActions();
   const selected = catalog?.sessions.find((session) => session.id === selectedId);
+  useEffect(() => {
+    if (catalog && selectedId !== null && !selected) setSelectedId(null);
+  }, [catalog, selectedId, selected]);
+  const hideChildren = useCallback(() => {
+    if (selected?.parentId != null) setSelectedId(null);
+  }, [selected]);
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -59,9 +69,12 @@ export function App() {
               onMenu={setMenu}
               onDelete={deletion.ask}
               deleting={deletion.pending}
+              onHideChildren={hideChildren}
+              onCountsChange={setCounts}
             />
             {selected ? (
               <DetailPanel
+                key={`${selected.id}:${rename.revision}`}
                 session={selected}
                 projectName={
                   catalog.projects.find((project) => project.id === selected.projectId)?.name ??
@@ -154,7 +167,7 @@ export function App() {
         </span>
         <span>
           {catalog
-            ? `${catalog.projects.length} projects / ${catalog.sessions.length} sessions`
+            ? `${counts.projects} projects / ${counts.sessions} sessions`
             : "Local data stays on this device"}
         </span>
         <span>OpenCode {catalog?.opencodeVersion || "version unavailable"}</span>
@@ -165,6 +178,10 @@ export function App() {
           onClose={closeMenu}
           disabled={actions.pending !== null}
           onAction={(id, action) => void actions.perform(id, action)}
+          onRename={(id) => {
+            const session = catalog?.sessions.find((item) => item.id === id);
+            if (session) rename.ask(session);
+          }}
         />
       )}
       {deletion.request && (
@@ -174,6 +191,15 @@ export function App() {
           error={deletion.error}
           onCancel={deletion.cancel}
           onConfirm={() => void deletion.confirm()}
+        />
+      )}
+      {rename.session && (
+        <RenameDialog
+          session={rename.session}
+          pending={rename.pending}
+          error={rename.error}
+          onCancel={rename.cancel}
+          onConfirm={(title) => void rename.confirm(title)}
         />
       )}
     </div>
