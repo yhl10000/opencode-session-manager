@@ -155,7 +155,7 @@ h2 {
 }
 .workspace {
   display: grid;
-  grid-template-columns: clamp(320px, 38vw, 520px) minmax(0, 1fr);
+  grid-template-columns: clamp(480px, 57vw, 780px) minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   min-width: 0;
