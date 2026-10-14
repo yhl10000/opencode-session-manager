@@ -3,6 +3,7 @@ use crate::{
     dto::{Catalog, DeleteResult, LaunchMode, SessionDetail},
     error::BackendError,
     launcher,
+    mutation::ExitDecision,
 };
 use std::{path::Path, process::Command, sync::Arc};
 use tauri::State;
@@ -65,16 +66,42 @@ async fn open_directory(
 }
 
 pub fn run() -> std::result::Result<(), tauri::Error> {
-    tauri::Builder::default()
-        .manage(Arc::new(BackendState::default()))
+    let state = Arc::new(BackendState::default());
+    let app = tauri::Builder::default()
+        .manage(Arc::clone(&state))
         .invoke_handler(tauri::generate_handler![
             get_catalog,
             get_session_detail,
             launch_session,
             open_directory,
-            delete_sessions
+            delete_sessions,
+            rename_session
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())?;
+    app.run(move |handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+            match state.mutations.request_shutdown() {
+                Ok(ExitDecision::Exit) => {}
+                Ok(ExitDecision::Wait) => api.prevent_exit(),
+                Ok(ExitDecision::Drain) => {
+                    api.prevent_exit();
+                    let state = Arc::clone(&state);
+                    let handle = handle.clone();
+                    tauri::async_runtime::spawn_blocking(move || {
+                        match state.mutations.wait_drained() {
+                            Ok(()) => handle.exit(code.unwrap_or(0)),
+                            Err(error) => eprintln!("Cannot finish application shutdown: {error}"),
+                        }
+                    });
+                }
+                Err(error) => {
+                    api.prevent_exit();
+                    eprintln!("Cannot begin application shutdown: {error}");
+                }
+            }
+        }
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -84,11 +111,26 @@ async fn delete_sessions(
 ) -> std::result::Result<DeleteResult, String> {
     let state = Arc::clone(state.inner());
     blocking(move || {
-        let _guard = state.deletion_lock.lock().map_err(|_| {
-            BackendError::Deletion("Deletion state is unavailable. Restart the app.".into())
-        })?;
-        let discovery = state.discovery()?;
-        crate::deletion::delete(&discovery, &session_ids)
+        state.mutations.execute(|| {
+            let discovery = state.discovery()?;
+            crate::deletion::delete(&discovery, &session_ids)
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+async fn rename_session(
+    session_id: String,
+    title: String,
+    state: State<'_, Arc<BackendState>>,
+) -> std::result::Result<Catalog, String> {
+    let state = Arc::clone(state.inner());
+    blocking(move || {
+        state.mutations.execute(|| {
+            let discovery = state.discovery()?;
+            crate::rename::rename(&discovery, &session_id, &title)
+        })
     })
     .await
 }
