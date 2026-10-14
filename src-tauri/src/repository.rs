@@ -32,6 +32,10 @@ struct AssistantMetadata {
 }
 
 impl Repository {
+    pub fn database_path(&self) -> &std::path::Path {
+        &self.path
+    }
+
     pub const fn new(path: PathBuf, version: String) -> Self {
         Self { path, version }
     }

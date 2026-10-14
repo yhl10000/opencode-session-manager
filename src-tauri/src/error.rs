@@ -20,6 +20,12 @@ pub enum BackendError {
     MissingDirectory(String),
     #[error("Deletion refused: {0}")]
     Deletion(String),
+    #[error("Session rename failed: {0}")]
+    Rename(String),
+    #[error("Application is closing; session mutations are no longer accepted")]
+    ShuttingDown,
+    #[error("Mutation state is unavailable. Restart the app.")]
+    MutationUnavailable,
 }
 
 pub type Result<T> = std::result::Result<T, BackendError>;
