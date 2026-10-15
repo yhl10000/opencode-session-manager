@@ -135,14 +135,16 @@ h2 {
   width: var(--line);
   background: var(--border);
 }
-.language-selector {
+.language-selector,
+.theme-selector {
   display: flex;
   align-items: center;
   gap: var(--s2);
   color: var(--secondary);
   white-space: nowrap;
 }
-.language-selector select {
+.language-selector select,
+.theme-selector select {
   min-height: var(--control);
   padding: var(--s2);
   border: var(--line) solid var(--border);
@@ -197,6 +199,7 @@ h2 {
   }
   .app-header {
     padding: var(--s3) var(--s4);
+    flex-wrap: wrap;
   }
   .local-label,
   .header-divider {
@@ -211,8 +214,10 @@ h2 {
   }
   .header-actions {
     flex-shrink: 0;
+    flex-wrap: wrap;
   }
-  .language-selector {
+  .language-selector,
+  .theme-selector {
     flex-direction: column;
     align-items: flex-start;
     gap: 0;

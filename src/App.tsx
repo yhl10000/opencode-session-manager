@@ -10,6 +10,7 @@ import { useActions } from "./hooks/useActions";
 import { useCatalog } from "./hooks/useCatalog";
 import { useDeletion } from "./hooks/useDeletion";
 import { useRename } from "./hooks/useRename";
+import { useTheme } from "./hooks/useTheme";
 import { LocaleProvider, Message, useLocale } from "./i18n/locale";
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
 }
 function Workspace() {
   const { t, number, locale, setLocale, warning } = useLocale();
+  const theme = useTheme();
   const { desktop, catalog, loading, error, refresh, replaceCatalog } = useCatalog();
   const deletion = useDeletion(replaceCatalog);
   const rename = useRename(replaceCatalog);
@@ -46,6 +48,20 @@ function Workspace() {
           <span>{t("manager")}</span>
         </div>
         <div className="header-actions">
+          <label className="theme-selector">
+            <span>{t("theme")}</span>
+            <select
+              value={theme.theme}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === "light" || next === "dark" || next === "system") theme.setTheme(next);
+              }}
+            >
+              <option value="light">{t("themeLight")}</option>
+              <option value="dark">{t("themeDark")}</option>
+              <option value="system">{t("themeSystem")}</option>
+            </select>
+          </label>
           <label className="language-selector">
             <span>{t("language")}</span>
             <select
@@ -179,6 +195,11 @@ function Workspace() {
       {warning && (
         <div className="refresh-error" role="status">
           <Message message={warning} />
+        </div>
+      )}
+      {theme.warning && (
+        <div className="refresh-error" role="status">
+          <Message message={theme.warning} />
         </div>
       )}
       <footer className="status-bar">
