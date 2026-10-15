@@ -4,7 +4,7 @@
 
 The interface is a quiet desktop workbench for finding and reopening OpenCode sessions. It favors a continuous project explorer, legible technical metadata, restrained surfaces, and a clear launch action. It is a local utility, not a dashboard or a replacement for the OpenCode TUI.
 
-The application uses a dark color scheme regardless of the operating system theme. Color distinguishes hierarchy and state without making selection or status depend on color alone.
+The application offers light, dark and system color schemes. Dark remains the default for existing users. Theme selection is stored independently from language and view preferences. Color distinguishes hierarchy and state without making selection or status depend on color alone.
 
 ## Visual tokens
 
@@ -30,6 +30,8 @@ The application uses a dark color scheme regardless of the operating system them
 | Success | `--success` | `#9ce0be` |
 | Error | `--error` | `#ffb4ac` |
 | Warning | `--warning` | `#e8cd98` |
+
+The light palette overrides these same tokens: canvas `#f4f6f8`, panel `#ffffff`, elevated `#ffffff`, inset `#f8fafb`, text `#18242d`, secondary `#354956`, muted `#526574`, border `#81929f`, subtle `#d4dde3`, hover `#edf2f5`, selected `#dce9ef`, accent `#146c5e`, accent hover `#10594e`, accent ink `#ffffff`, info `#2463a5`, success `#216c42`, error `#b42332`, warning `#805600`. Theme-specific shadows and modal scrims use `--shadow`, `--highlight` and `--backdrop`; controls use the resolved native `color-scheme`.
 
 ### Type and spacing
 

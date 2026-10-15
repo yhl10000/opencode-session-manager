@@ -83,7 +83,7 @@
   display: grid;
   place-items: center;
   padding: var(--s4);
-  background: #0009;
+  background: var(--backdrop);
 }
 .delete-dialog {
   width: min(520px, 100%);

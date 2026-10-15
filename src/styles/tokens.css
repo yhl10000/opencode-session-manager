@@ -20,6 +20,7 @@
   --warning: #e8cd98;
   --shadow: 0 12px 36px #0008;
   --highlight: inset 0 1px #ffffff05;
+  --backdrop: #0009;
   --font: "Segoe UI Variable", "Segoe UI", sans-serif;
   --mono: "Cascadia Code", Consolas, monospace;
   --text-xs: 12px;
@@ -49,4 +50,28 @@
   --menu-width: 256px;
   --meta-min: 160px;
   --micro: 120ms;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f4f6f8;
+  --panel: #ffffff;
+  --elevated: #ffffff;
+  --inset: #f8fafb;
+  --text: #18242d;
+  --secondary: #354956;
+  --muted: #526574;
+  --border: #81929f;
+  --subtle: #d4dde3;
+  --hover: #edf2f5;
+  --selected: #dce9ef;
+  --accent: #146c5e;
+  --accent-hover: #10594e;
+  --accent-ink: #ffffff;
+  --info: #2463a5;
+  --success: #216c42;
+  --error: #b42332;
+  --warning: #805600;
+  --shadow: 0 12px 36px #18242d26;
+  --highlight: inset 0 1px #ffffff80;
+  --backdrop: #18242d66;
 }
