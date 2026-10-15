@@ -23,7 +23,7 @@ export function installFixture() {
             ][index % 5],
       directory: project.path,
       createdAt: now - (index + 20) * 3600000,
-      updatedAt: now - (index + group * 6) * 3600000,
+      updatedAt: now - (index + group * 6 + (index >= 6 ? 72 : 0)) * 3600000,
       messageCount: 6 + index,
       model: index % 3 === 0 ? null : "gpt-5.1-codex",
       provider: index % 3 === 0 ? null : "github-copilot",
