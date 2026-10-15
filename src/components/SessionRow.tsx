@@ -1,11 +1,13 @@
 import { Check, MessageSquare, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
 import { useLocale } from "../i18n/locale";
+import { isRecentlyActive } from "../lib/activity";
 import { available, localTime, relativeTime } from "../lib/format";
 import type { SessionSummary } from "../lib/types";
 import type { MenuPosition } from "./SessionMenu";
 
 type Props = {
   readonly session: SessionSummary;
+  readonly now?: number;
   readonly selected: boolean;
   readonly onSelect: (id: string) => void;
   readonly onLaunch: (id: string) => void;
@@ -17,6 +19,7 @@ type Props = {
 };
 export function SessionRow({
   session,
+  now = Date.now(),
   selected,
   onSelect,
   onLaunch,
@@ -28,8 +31,9 @@ export function SessionRow({
 }: Props) {
   const { t, locale, number, compact } = useLocale();
   const title = session.title || t("untitled");
+  const recent = isRecentlyActive(session.updatedAt, now);
   return (
-    <div className={`session-row ${selected ? "selected" : ""}`}>
+    <div className={`session-row ${recent ? "recent" : ""} ${selected ? "selected" : ""}`}>
       <button
         type="button"
         className="session-select"
@@ -63,8 +67,15 @@ export function SessionRow({
           {selected ? <Check aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}
         </span>
         <span className="row-content">
-          <span className="row-title" title={session.title}>
-            {title}
+          <span className="row-heading">
+            <span className="row-title" title={session.title}>
+              {title}
+            </span>
+            {recent && (
+              <span className="recent-badge" title={t("recentActivityHint")}>
+                {t("recentActivity")}
+              </span>
+            )}
           </span>
           <span className="row-meta">
             <span title={available(session.model, locale)}>{available(session.model, locale)}</span>

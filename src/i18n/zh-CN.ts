@@ -49,6 +49,8 @@ export const chinese = {
   doubleClick: "双击在标签页中打开",
   rightClick: "右键查看操作",
   sessions: "会话",
+  recentActivity: "近期活跃",
+  recentActivityHint: "最近 72 小时内有活动",
   collapseAll: "折叠全部项目",
   clearToCollapse: "请先清除搜索再折叠全部项目",
   expandAll: "展开全部项目",

@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Folder, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useActivityClock } from "../hooks/useActivityClock";
 import { useExplorerView } from "../hooks/useExplorerView";
 import { useLocale } from "../i18n/locale";
 import { isExpanded, loadMore, PAGE_SIZE } from "../lib/catalog";
@@ -37,6 +38,7 @@ export function Explorer({
 }: Props) {
   const { t, number } = useLocale();
   const view = useExplorerView(catalog);
+  const now = useActivityClock(catalog.sessions);
   const { preferences, query, setQuery, groups, update, togglePin, count } = view;
   const [pages, setPages] = useState<Readonly<Record<string, number>>>({});
   useEffect(() => {
@@ -119,6 +121,7 @@ export function Explorer({
                     <SessionRow
                       key={session.id}
                       session={session}
+                      now={now}
                       selected={session.id === selectedId}
                       onSelect={onSelect}
                       onLaunch={onLaunch}

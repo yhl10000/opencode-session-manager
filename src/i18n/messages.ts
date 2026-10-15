@@ -48,6 +48,8 @@ export const english = {
   doubleClick: "Double-click to open in a tab",
   rightClick: "Right-click for actions",
   sessions: "Sessions",
+  recentActivity: "Recent",
+  recentActivityHint: "Active within the last 72 hours",
   collapseAll: "Collapse all projects",
   clearToCollapse: "Clear search to collapse all projects",
   expandAll: "Expand all projects",
