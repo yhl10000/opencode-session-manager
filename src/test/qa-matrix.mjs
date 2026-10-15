@@ -6,6 +6,17 @@ export async function captureMatrix(page, evidence) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     for (const colorScheme of ["dark", "light"]) {
       await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      await page.locator(".theme-selector select").selectOption(colorScheme);
+      assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+      assert.equal(
+        await page.locator("body").evaluate((element) => getComputedStyle(element).backgroundColor),
+        colorScheme === "light" ? "rgb(244, 246, 248)" : "rgb(16, 19, 22)",
+      );
+      for (const selector of [".explorer-scroll", ".detail-scroll"]) {
+        await page.locator(selector).evaluate((element) => {
+          element.scrollTop = 0;
+        });
+      }
       await page.screenshot({
         path: join(evidence, `session-manager-${width}-${colorScheme}.png`),
       });

@@ -197,6 +197,12 @@ try {
   await page.getByRole("button", { name: "Retry refresh" }).click();
   await page.getByText("Refresh failed.", { exact: false }).waitFor({ state: "hidden" });
   await captureMatrix(page, evidence);
+  await page.locator(".theme-selector select").selectOption("system");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.waitForFunction(() => document.documentElement.dataset.theme === "light");
+  await page.locator(".theme-selector select").selectOption("light");
   const calls = await page.evaluate(() => window.__QA_CALLS__);
   assert(calls.some((call) => call.command === "launch_session" && call.args.mode === "tab"));
   assert(calls.some((call) => call.command === "launch_session" && call.args.mode === "window"));
@@ -222,6 +228,9 @@ try {
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   assert.equal(await page.locator('.project-group[aria-label="Developer Studio"]').count(), 0);
   assert.equal(await page.evaluate(() => window.__QA_DELETED__.length), 23);
+  await page.reload();
+  assert.equal(await page.locator(".theme-selector select").inputValue(), "light");
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   console.log(
     `PASS: ${locale}; widths 390/1440/1920; ${errors.length} browser errors; screenshots: ${evidence}`,
   );
