@@ -41,6 +41,8 @@ Spacing follows a 4-pixel base. The available spacing tokens are 4, 8, 12, 16, 2
 
 ## Layout
 
+Recently active sessions (last activity within the rolling 72 hours, excluding future timestamps) have a prominent green wash and a localized text badge. Selection takes precedence; recent rows retain a stronger green wash on hover. Recency does not alter sorting or pinning. Dark tokens are `--recent: #24433a`, `--recent-hover: #2b5044`, `--recent-muted: #b4c9c0`, `--recent-ink: #a5dfcf`; light tokens are `--recent: #c9eadb`, `--recent-hover: #b8e1cc`, `--recent-muted: #405d50`, `--recent-ink: #235d4c`.
+
 The application shell fills the viewport and keeps the header and status footer visible. The workspace has a project and session explorer beside a flexible detail pane. The explorer width is `clamp(480px, 57vw, 780px)`, 1.5 times its original desktop width. Each pane owns its content scrolling, preventing the page shell from becoming a competing scroll container.
 
 At narrow widths, the panes stack vertically. The explorer remains bounded so the detail pane can be reached without losing its own scroll behavior. Keep project groups in a continuous explorer rather than introducing a separate project-navigation gate.

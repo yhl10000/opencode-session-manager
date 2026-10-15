@@ -11,6 +11,10 @@
   --subtle: #252e35;
   --hover: #222b32;
   --selected: #2b3943;
+  --recent: #24433a;
+  --recent-hover: #2b5044;
+  --recent-muted: #b4c9c0;
+  --recent-ink: #a5dfcf;
   --accent: #78d8c5;
   --accent-hover: #99e5d6;
   --accent-ink: #102721;
@@ -64,6 +68,10 @@
   --subtle: #d4dde3;
   --hover: #edf2f5;
   --selected: #dce9ef;
+  --recent: #c9eadb;
+  --recent-hover: #b8e1cc;
+  --recent-muted: #405d50;
+  --recent-ink: #235d4c;
   --accent: #146c5e;
   --accent-hover: #10594e;
   --accent-ink: #ffffff;
