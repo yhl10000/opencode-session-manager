@@ -3,6 +3,7 @@ import type { Dictionary } from "./messages";
 export const chinese = {
   appTitle: "OpenCode 会话管理器",
   manager: "会话管理器",
+  managerVersion: "会话管理器版本 {version}",
   language: "语言",
   theme: "主题",
   themeLight: "浅色",

@@ -1,6 +1,7 @@
 export const english = {
   appTitle: "OpenCode Session Manager",
   manager: "Session Manager",
+  managerVersion: "Session Manager version {version}",
   language: "Language",
   theme: "Theme",
   themeLight: "Light",

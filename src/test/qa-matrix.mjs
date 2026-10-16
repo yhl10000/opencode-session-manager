@@ -23,7 +23,7 @@ export async function captureMatrix(page, evidence) {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
       assert.equal(overflow, false, `Horizontal overflow at ${width}`);
       const clippedHeaderControls = await page
-        .locator(".app-header button, .app-header select")
+        .locator(".app-header button, .app-header select, .app-version")
         .evaluateAll(
           (elements) =>
             elements.filter((element) => {

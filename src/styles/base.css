@@ -126,9 +126,18 @@ h2 {
   width: var(--icon-lg);
   height: var(--icon-lg);
 }
-.brand > span:last-child,
+.manager-label,
 .local-label {
   color: var(--muted);
+}
+.app-version {
+  flex-shrink: 0;
+  padding: 0 var(--s1);
+  border-radius: var(--r1);
+  background: var(--inset);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 .header-divider {
   height: var(--s4);
@@ -209,7 +218,7 @@ h2 {
     gap: var(--s2);
     flex-wrap: wrap;
   }
-  .brand > span:last-child {
+  .manager-label {
     font-size: var(--text-xs);
   }
   .header-actions {

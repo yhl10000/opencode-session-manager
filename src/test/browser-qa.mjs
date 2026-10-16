@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
@@ -10,6 +10,9 @@ import { startPreview } from "./qa-server.mjs";
 
 const baseURL = process.env.SESSION_MANAGER_QA_URL ?? "http://127.0.0.1:1420";
 const locale = process.env.SESSION_MANAGER_QA_LOCALE ?? "en";
+const { version } = JSON.parse(
+  await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+);
 assert(["en", "zh-CN"].includes(locale));
 const evidence = await mkdtemp(join(tmpdir(), `session-manager-${locale}-`));
 const server = await startPreview();
@@ -26,6 +29,7 @@ page.on("pageerror", (error) => errors.push(error.message));
 try {
   await page.goto(baseURL);
   await page.getByText("Desktop app required").waitFor();
+  assert.equal(await page.locator(".app-version").textContent(), `v${version}`);
   assert.equal(await page.locator("html").getAttribute("lang"), locale);
   const other = locale === "en" ? "zh-CN" : "en";
   await page.locator(".language-selector select").selectOption(other);
@@ -34,9 +38,23 @@ try {
   await page.reload();
   assert.equal(await page.locator(".language-selector select").inputValue(), locale);
   await page.screenshot({ path: join(evidence, "session-manager-desktop-required.png") });
+  const failedPage = await context.newPage();
+  await failedPage.addInitScript(
+    `(${installFixture.toString()})(); window.__QA_FAILURE__ = "get_catalog";`,
+  );
+  await failedPage.goto(baseURL);
+  await failedPage.getByRole("alert").waitFor();
+  assert.equal(await failedPage.locator(".app-version").textContent(), `v${version}`);
+  await failedPage.screenshot({ path: join(evidence, "session-manager-database-error.png") });
+  await failedPage.close();
   await page.addInitScript(installFixture);
   await page.reload();
   await page.getByRole("checkbox", { name: "Show child sessions" }).waitFor();
+  assert.equal(
+    await page.locator(".status-bar > span:last-child").textContent(),
+    "OpenCode CLI 1.19.0",
+  );
+  assert.equal(await page.locator(".app-version").textContent(), `v${version}`);
   assert.equal(
     await page.getByRole("button", { name: "Select Refine the session dispatch pipeline" }).count(),
     0,

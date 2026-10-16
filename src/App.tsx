@@ -45,7 +45,13 @@ function Workspace() {
           <Terminal aria-hidden="true" />
           <strong>OpenCode</strong>
           <span className="header-divider" />
-          <span>{t("manager")}</span>
+          <span className="manager-label">{t("manager")}</span>
+          <span
+            className="app-version mono"
+            title={t("managerVersion", { version: __APP_VERSION__ })}
+          >
+            v{__APP_VERSION__}
+          </span>
         </div>
         <div className="header-actions">
           <label className="theme-selector">
@@ -218,7 +224,7 @@ function Workspace() {
               })
             : t("localData")}
         </span>
-        <span>OpenCode {catalog?.opencodeVersion || t("versionUnavailable")}</span>
+        <span>OpenCode CLI {catalog?.opencodeVersion || t("versionUnavailable")}</span>
       </footer>
       {menu && (
         <SessionMenu
