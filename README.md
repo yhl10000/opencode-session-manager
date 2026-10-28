@@ -22,6 +22,7 @@ The installer uses Tauri's default WebView2 download bootstrapper: if WebView2 R
 - Groups can be expanded, collapsed, and paginated independently, and all groups can be collapsed or expanded with one click; batch expand/collapse preserves selection and pagination, and is disabled during search.
 - Child sessions are hidden by default; can be toggled to show, and the app remembers this preference. Hidden child sessions remain in the original directory data, and deleting a project includes them in the confirmation.
 - Projects and sessions have delete buttons on the right, requiring double confirmation. Deleting a project removes all sessions in that directory group; when the last session is deleted, the group disappears; folders and source code files are not deleted.
+- Open a project's working directory in Windows Explorer from its header, even when the group is collapsed.
 - Search project names, session titles, session IDs, paths, models, and providers. Matching project groups are automatically expanded during search.
 - Pin multiple sessions per project; pin state is stored in local browser preferences, pinned sessions appear first within their project, and the remaining sessions are sorted by recent activity. Filter conditions apply to pinned sessions too.
 - Sort by recent activity time or project name.
