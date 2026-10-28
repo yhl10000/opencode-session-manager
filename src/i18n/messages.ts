@@ -80,6 +80,7 @@ export const english = {
   openWindow: "Open in window",
   copyId: "Copy session ID",
   openDirectory: "Open directory",
+  openProjectFolder: "Open project folder {name}",
   rename: "Rename session",
   renameExplanation:
     "Update this session's title in OpenCode. Conversation history stays unchanged.",

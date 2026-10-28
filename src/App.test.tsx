@@ -46,6 +46,17 @@ it("loads preview only when a session is selected", async () => {
   expect(await screen.findByText("Preview content")).toBeInTheDocument();
   expect(invoke).toHaveBeenCalledWith("get_session_detail", { sessionId: "ses_a" });
 });
+it("opens a project folder through the existing session directory command", async () => {
+  render(<App />);
+  await userEvent.click(await screen.findByRole("button", { name: "Open project folder Alpha" }));
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("open_directory", { sessionId: "ses_a" }),
+  );
+  expect(invoke.mock.calls.filter(([command]) => command === "get_session_detail")).toHaveLength(0);
+  expect(
+    await screen.findByText("Directory open request sent to Windows Explorer."),
+  ).toBeInTheDocument();
+});
 it("discards older detail when selections resolve out of order", async () => {
   let resolveOld: ((value: SessionDetail) => void) | undefined;
   invoke.mockImplementation(async (command, args) => {

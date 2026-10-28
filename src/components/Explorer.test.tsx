@@ -74,3 +74,23 @@ it("expands all groups after collapse while preserving loaded pages", () => {
 
   expect(screen.getAllByRole("button", { name: /Select / })).toHaveLength(2);
 });
+
+it("opens the project's directory while the project is collapsed and without selecting a session", () => {
+  const onOpenProject = vi.fn();
+  const onSelect = vi.fn();
+  render(
+    <Explorer
+      catalog={catalog}
+      selectedId={null}
+      onSelect={onSelect}
+      onLaunch={vi.fn()}
+      onMenu={vi.fn()}
+      onOpenProject={onOpenProject}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Collapse all projects" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open project folder Alpha" }));
+  expect(onOpenProject).toHaveBeenCalledWith("ses_a");
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Select Fix routing" })).not.toBeInTheDocument();
+});

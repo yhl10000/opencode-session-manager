@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useActivityClock } from "../hooks/useActivityClock";
 import { useExplorerView } from "../hooks/useExplorerView";
@@ -17,6 +17,8 @@ type Props = {
   readonly onSelect: (id: string) => void;
   readonly onLaunch: (id: string) => void;
   readonly onMenu: (position: MenuPosition) => void;
+  readonly onOpenProject?: (sessionId: string) => void;
+  readonly opening?: boolean;
   readonly onDelete?: (request: DeleteRequest) => void;
   readonly deleting?: boolean;
   readonly onHideChildren?: () => void;
@@ -31,6 +33,8 @@ export function Explorer({
   onSelect,
   onLaunch,
   onMenu,
+  onOpenProject,
+  opening,
   onDelete,
   deleting,
   onHideChildren,
@@ -53,6 +57,7 @@ export function Explorer({
       <div className="explorer-scroll">
         {groups.map(({ project, sessions }) => {
           const expanded = isExpanded(project.id, preferences.collapsed, query);
+          const firstSession = sessions[0];
           const visible = pages[project.id] ?? PAGE_SIZE;
           const remaining = Math.max(0, sessions.length - visible);
           return (
@@ -87,6 +92,20 @@ export function Explorer({
                   </span>
                   <span className="count">{number(sessions.length)}</span>
                 </button>
+                {onOpenProject && firstSession && (
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={t("openProjectFolder", {
+                      name: project.name || t("unnamedProject"),
+                    })}
+                    title={t("openDirectory")}
+                    disabled={opening}
+                    onClick={() => onOpenProject(firstSession.id)}
+                  >
+                    <FolderOpen aria-hidden="true" />
+                  </button>
+                )}
                 {onDelete && (
                   <button
                     type="button"

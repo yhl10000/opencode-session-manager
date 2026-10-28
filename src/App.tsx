@@ -114,6 +114,8 @@ function Workspace() {
               onSelect={setSelectedId}
               onLaunch={(id) => void actions.perform(id, "tab")}
               onMenu={setMenu}
+              onOpenProject={(id) => void actions.perform(id, "directory")}
+              opening={actions.pending !== null}
               onDelete={deletion.ask}
               deleting={deletion.pending}
               onHideChildren={hideChildren}

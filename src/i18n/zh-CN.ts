@@ -81,6 +81,7 @@ export const chinese = {
   openWindow: "在新窗口中打开",
   copyId: "复制会话 ID",
   openDirectory: "打开目录",
+  openProjectFolder: "打开项目文件夹 {name}",
   rename: "重命名会话",
   renameExplanation: "更新 OpenCode 中的会话标题，对话历史保持不变。",
   sessionTitle: "会话标题",
