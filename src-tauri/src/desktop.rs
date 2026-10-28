@@ -1,11 +1,10 @@
 use crate::{
     discovery::{BackendState, executable},
     dto::{Catalog, DeleteResult, LaunchMode, SessionDetail},
-    error::BackendError,
     launcher,
     mutation::ExitDecision,
 };
-use std::{path::Path, process::Command, sync::Arc};
+use std::{process::Command, sync::Arc};
 use tauri::State;
 
 async fn blocking<T: Send + 'static>(
@@ -54,11 +53,9 @@ async fn open_directory(
     let state = Arc::clone(state.inner());
     blocking(move || {
         let session = state.discovery()?.repository.session(&session_id)?;
-        if !Path::new(&session.directory).is_dir() {
-            return Err(BackendError::MissingDirectory(session.directory));
-        }
+        let directory = crate::open_directory::explorer_directory(&session.directory)?;
         Command::new(executable("explorer")?)
-            .arg(session.directory)
+            .arg(directory)
             .spawn()?;
         Ok(())
     })

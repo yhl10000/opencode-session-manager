@@ -7,6 +7,7 @@ pub mod error;
 mod grouping;
 pub mod launcher;
 pub mod mutation;
+pub mod open_directory;
 mod preview;
 pub mod rename;
 mod rename_api;
