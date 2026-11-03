@@ -39,9 +39,9 @@
 - Windows 11。
 - WebView2 Runtime。
 - PowerShell 7（`pwsh`）和 Windows Terminal（`wt`），且应用可通过 `PATH` 找到它们。
-- OpenCode CLI（`opencode`），且应用可通过 `PATH` 找到它；CLI 需要提供 `db path` 命令和 `--session` 参数。重命名还需要 CLI 支持 `--pure serve`。
+- OpenCode CLI（`opencode`），且应用可通过 `PATH` 找到它；V2 使用 `debug paths db` 发现数据库，V1 使用 `db path`。打开会话需要 `--session`，重命名还需要 V1 的 `--pure serve` 接口。
 
-应用通过 `opencode db path` 发现数据库位置。OpenCode 的数据库 schema 可能变化；兼容性取决于应用读取的表字段和数据格式。项目不指定固定的 OpenCode 版本基线。
+应用支持读取 V1 和 V2 会话表。升级后的数据库若同时保留新旧表，应用读取 V2 表，不展示陈旧的 V1 记录。OpenCode 的数据库 schema 可能变化；兼容性取决于应用读取的表字段和数据格式。
 
 开发和构建还需要 Node.js 与 npm、Rust 工具链与 Cargo、包含 MSVC 的 Visual Studio C++ 构建工具，以及其他 [Tauri 2 Windows 开发依赖](https://v2.tauri.app/start/prerequisites/#windows)。
 
@@ -51,10 +51,10 @@
 pwsh --version
 wt --version
 opencode --help
-opencode db path
+opencode debug paths db # V2；V1 使用 opencode db path
 ```
 
-确认 OpenCode 帮助信息包含 `--session` 和 `--pure serve`，并且 `opencode db path` 返回现存的数据库文件。
+确认 OpenCode 帮助信息包含 `--session`，并且对应版本的数据库路径命令返回现存文件。当前重命名和删除实现需要 V1 维护接口。
 
 ## 开发与测试
 
@@ -113,6 +113,7 @@ Tauri CLI 会将可执行文件和已配置的安装包写入 `src-tauri/target/
 
 ## 限制
 
+- OpenCode V2 兼容范围包括数据库发现、会话浏览和文本预览。重命名和删除仍使用 V1 维护接口，不支持 V2。
 - 官方删除命令会递归删除子会话。单会话删除存在子会话时会被拒绝，请先删除子会话；目录批量删除若涉及未选中的子会话也会被拒绝。批量删除可能部分成功，界面会报告错误并展示实际剩余数据。删除时不要在其他 OpenCode 窗口继续创建或修改相关子会话。
 
 - OpenCode 的数据库 schema 和 JSON 格式可能变化。应用依赖当前读取的表字段和数据形状；如果不兼容，目录读取可能失败，管理器不会尝试修复数据库。
@@ -125,7 +126,7 @@ Tauri CLI 会将可执行文件和已配置的安装包写入 `src-tauri/target/
 
 ## 故障排查
 
-如果会话无法加载，请确认启动应用的环境能够通过 `PATH` 找到 `opencode`，`opencode db path` 指向现存且可读取的文件，并且数据库格式兼容。修改 `PATH` 或修复发现错误后，请重启应用。
+如果会话无法加载，请确认启动应用的环境能够通过 `PATH` 找到 `opencode`，`opencode debug paths db`（V2）或 `opencode db path`（V1）指向现存且可读取的文件，并且数据库格式兼容。修改 `PATH` 或修复发现错误后，请重启应用。
 
 如果 Windows Terminal 未打开所选会话，请确认 `wt`、`pwsh` 和 `opencode` 都可通过 `PATH` 找到，OpenCode 帮助信息包含 `--session`，且会话工作目录仍然存在。检查新终端中的错误。管理器可以报告已分派请求，但无法确认 TUI 是否就绪。
 

@@ -10,6 +10,138 @@ fn fixture() -> Result<(TempDir, Repository), Box<dyn std::error::Error>> {
     Ok((temp, Repository::new(path, "test".into())))
 }
 
+fn v2_fixture(mixed: bool) -> Result<(TempDir, Repository), Box<dyn std::error::Error>> {
+    let temp = TempDir::new()?;
+    let path = temp.path().join("v2.db");
+    let db = Connection::open(&path)?;
+    if mixed {
+        db.execute_batch(include_str!("schema.sql"))?;
+    }
+    db.execute_batch(include_str!("schema-v2.sql"))?;
+    Ok((temp, Repository::new(path, "2.2.5".into())))
+}
+
+#[test]
+fn mixed_catalog_uses_only_v2_with_message_metadata_and_tokens() {
+    let (_temp, repo) = v2_fixture(true).unwrap();
+    let catalog = repo.catalog().unwrap();
+    assert_eq!(catalog.sessions.len(), 1);
+    let session = &catalog.sessions[0];
+    assert_eq!(session.id, "ses_v2");
+    assert_eq!(session.message_count, 3);
+    assert_eq!(session.model.as_deref(), Some("new-model"));
+    assert_eq!(session.provider.as_deref(), Some("new-provider"));
+    assert_eq!(session.tokens, Some(20));
+    assert_eq!(catalog.projects.len(), 1);
+    assert!(repo.session("ses_a").is_err());
+}
+
+#[test]
+fn v2_detail_reads_message_type_seq_and_text_parts_by_ordinal() {
+    let (_temp, repo) = v2_fixture(false).unwrap();
+    Connection::open(repo.database_path()).unwrap().execute(
+        "INSERT INTO session_part VALUES ('msg_user','ses_v2',1,'text',1,1,'{\"text\":\"not a user prompt\"}')", [],
+    ).unwrap();
+    let detail = repo.detail("ses_v2").unwrap();
+    assert_eq!(detail.session.title, "");
+    assert_eq!(detail.session.message_count, 3);
+    assert_eq!(detail.session.model.as_deref(), Some("new-model"));
+    assert_eq!(detail.session.tokens, Some(20));
+    assert_eq!(
+        detail
+            .preview
+            .iter()
+            .map(|m| m.id.as_str())
+            .collect::<Vec<_>>(),
+        ["msg_user", "msg_old", "msg_new"]
+    );
+    assert_eq!(detail.preview[0].role, "user");
+    assert_eq!(detail.preview[0].text, "question");
+    assert_eq!(detail.preview[2].role, "assistant");
+    assert_eq!(detail.preview[2].text, "first\nsecond");
+    assert!(!detail.preview_truncated);
+    assert!(
+        repo.connect()
+            .unwrap()
+            .execute("DELETE FROM session_v2", [])
+            .is_err()
+    );
+}
+
+#[test]
+fn empty_v2_never_falls_back_to_legacy_sessions() {
+    let (_temp, repo) = v2_fixture(true).unwrap();
+    Connection::open(repo.database_path())
+        .unwrap()
+        .execute("DELETE FROM session_v2", [])
+        .unwrap();
+    assert!(repo.catalog().unwrap().sessions.is_empty());
+    assert!(repo.detail("ses_a").is_err());
+}
+
+#[test]
+fn mixed_detail_finds_current_v2_session() {
+    let (_temp, repo) = v2_fixture(true).unwrap();
+    assert_eq!(repo.detail("ses_v2").unwrap().session.id, "ses_v2");
+}
+
+#[test]
+fn v2_preview_keeps_last_forty_and_unicode_budgets() {
+    let (_temp, repo) = v2_fixture(false).unwrap();
+    let db = Connection::open(repo.database_path()).unwrap();
+    let data = serde_json::json!({"text": "中".repeat(5000)}).to_string();
+    for seq in 4..=45 {
+        db.execute(
+            "INSERT INTO session_message VALUES (?1,'ses_v2','user',?2,?2,?2,?3)",
+            rusqlite::params![format!("msg_{seq}"), seq, data],
+        )
+        .unwrap();
+    }
+    let detail = repo.detail("ses_v2").unwrap();
+    assert_eq!(detail.preview.len(), 40);
+    assert_eq!(detail.preview[0].id, "msg_6");
+    assert_eq!(detail.preview[39].id, "msg_45");
+    assert!(detail.preview_truncated);
+    assert!(
+        detail
+            .preview
+            .iter()
+            .all(|m| m.text.chars().count() <= 4000)
+    );
+    assert_eq!(
+        detail
+            .preview
+            .iter()
+            .map(|m| m.text.chars().count())
+            .sum::<usize>(),
+        24000
+    );
+}
+
+#[test]
+fn v2_session_model_takes_precedence_and_invalid_message_json_is_safe() {
+    let (_temp, repo) = v2_fixture(false).unwrap();
+    let db = Connection::open(repo.database_path()).unwrap();
+    db.execute(
+        r#"UPDATE session_v2 SET model='{"id":"selected","providerID":"selected-provider"}'"#,
+        [],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO session_message VALUES ('msg_invalid','ses_v2','assistant',4,4,4,'invalid')",
+        [],
+    )
+    .unwrap();
+    let session = repo.session("ses_v2").unwrap();
+    assert_eq!(session.model.as_deref(), Some("selected"));
+    assert_eq!(session.provider.as_deref(), Some("selected-provider"));
+    db.execute("UPDATE session_v2 SET model=NULL", []).unwrap();
+    assert_eq!(
+        repo.detail("ses_v2").unwrap().session.model.as_deref(),
+        Some("new-model")
+    );
+}
+
 #[test]
 fn missing_database_is_never_created() {
     let temp = TempDir::new().unwrap();

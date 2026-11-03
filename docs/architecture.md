@@ -8,7 +8,7 @@ OpenCode Session Manager is a Windows desktop application built with Tauri 2, Re
 React UI
   | Tauri command invocation
 Rust desktop backend
-  |-- OpenCode CLI: --version, --help, db path
+  |-- OpenCode CLI: --version, --help, debug paths db (V2) / db path (V1)
   |-- OpenCode SQLite database: read-only queries
   |-- OpenCode CLI: on-demand --pure serve for authenticated loopback rename
   `-- Windows Terminal (wt): new tab or window
@@ -20,11 +20,11 @@ The desktop backend owns access to the local database and process launcher. Fron
 
 ## Discovery and database access
 
-At initial discovery, the backend locates `opencode` on `PATH` and queries its version, help output, and `opencode db path`. It requires an absolute path to an existing database file and checks whether the CLI advertises `--session`. The database path is discovered at runtime; it is not tied to a particular user profile or installation directory. Discovery is cached for the lifetime of the application process.
+At initial discovery, the backend locates `opencode` on `PATH` and queries its version, help output, and database path using `opencode debug paths db` on V2 or `opencode db path` on V1. It requires an absolute path to an existing database file and checks whether the CLI advertises `--session`. The database path is discovered at runtime; it is not tied to a particular user profile or installation directory. Discovery is cached for the lifetime of the application process.
 
 Each catalog or detail operation opens a fresh SQLite connection with read-only access and enables `query_only`. The application does not directly write, migrate or initialize the database, or make a second copy. Confirmed deletion invokes the officially supported `opencode session delete` command. Rename uses the authenticated loopback HTTP API served by the official OpenCode CLI, never direct SQLite writes. OpenCode uses SQLite WAL journaling; the manager does not run a checkpoint or database maintenance operation.
 
-The catalog reads `session` and `message` data for directory groups, session summaries, and message counts. It does not read database project display names or load the body of every message. On selecting a session, detail loading fetches at most 40 messages and their text parts, with a limit of 4,000 characters per message and a 24,000-character total budget. Additional part-query limits can also truncate the preview. The detail response identifies truncation. This preview is not a complete transcript or export.
+The catalog reads V2 `session_v2` and `session_message`, or V1 `session` and `message`, for directory groups, session summaries, and message counts. If V2 tables exist, they take precedence even when empty: retained V1 tables must not surface stale or duplicate sessions. It does not read database project display names or load the body of every message. On selecting a session, detail loading fetches at most 40 messages and their text, with a limit of 4,000 characters per message and a 24,000-character total budget. V2 user text comes from message JSON; assistant text comes from `session_part` ordered by ordinal. Additional part-query limits can also truncate the preview. The detail response identifies truncation. This preview is not a complete transcript or export.
 
 Session summaries use recorded model and provider information when present. If a session lacks that metadata, the backend may fill it from the latest assistant message. Token totals are shown only when a nonzero total can be computed from the stored input, output, reasoning, cache-read, and cache-write fields; otherwise the value is unavailable.
 
@@ -61,7 +61,7 @@ Deletion requires a modal confirmation before IPC invocation. The backend checks
 
 ## Compatibility and failure behavior
 
-The database interface depends on the table fields and JSON shapes read from `session`, `message`, and `part`. It does not require the `project` table for directory grouping. OpenCode may change these shapes. If the required data cannot be read, catalog or detail loading can fail; the manager does not infer a replacement schema or repair the database. There is no fixed supported OpenCode version baseline. Runtime requirements are `opencode db path` and `--session`, plus `--pure serve` for renaming and compatible database fields.
+The database interface supports V1 `session`/`message`/`part` and V2 `session_v2`/`session_message`/`session_part` table fields and JSON shapes. It does not require the `project` table for directory grouping. OpenCode may change these shapes. If required data cannot be read, catalog or detail loading can fail; the manager does not repair the database. V2 support covers discovery and read-only browsing; rename and delete retain V1 maintenance interfaces and are not supported on V2.
 
 Opening a session also requires Windows Terminal, PowerShell 7, and an existing recorded working directory. Initial discovery errors are cached until the manager restarts. A semicolon in the PowerShell executable path is rejected; a semicolon in a working directory is carried inside the encoded script. Terminal process creation is asynchronous and the app cannot guarantee that the TUI is ready.
 

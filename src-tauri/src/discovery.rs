@@ -80,12 +80,29 @@ pub(crate) fn metadata_output(program: &Path, args: &[&str]) -> Result<String> {
         .map_err(|error| BackendError::Discovery(error.to_string()))
 }
 
+pub(crate) fn database_path_args(version: &str) -> &'static [&'static str] {
+    let version = version
+        .trim()
+        .strip_prefix("opencode ")
+        .unwrap_or(version.trim());
+    let major = version
+        .trim_start_matches('v')
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok());
+    if major.is_some_and(|major| major >= 2) {
+        &["debug", "paths", "db"]
+    } else {
+        &["db", "path"]
+    }
+}
+
 pub fn discover() -> Result<Discovery> {
     let opencode = executable("opencode")?;
     let version = metadata_output(&opencode, &["--version"])?;
     let help = metadata_output(&opencode, &["--help"])?;
     let supports_session = help.split_whitespace().any(|word| word == "--session");
-    let path = PathBuf::from(metadata_output(&opencode, &["db", "path"])?);
+    let path = PathBuf::from(metadata_output(&opencode, database_path_args(&version))?);
     if !path.is_absolute() || !path.is_file() {
         return Err(BackendError::Discovery(format!(
             "OpenCode returned an unavailable database path: {}",
@@ -102,6 +119,18 @@ pub fn discover() -> Result<Discovery> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn database_path_args_preserves_v1_command() {
+        assert_eq!(database_path_args("1.19.0"), &["db", "path"]);
+    }
+
+    #[test]
+    fn database_path_args_uses_v2_debug_paths_without_pure() {
+        for version in ["opencode v2.2.5", "2.2.5", "v2.2.5"] {
+            assert_eq!(database_path_args(version), &["debug", "paths", "db"]);
+        }
+    }
 
     #[test]
     fn metadata_reads_successful_help_from_stderr() {

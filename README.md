@@ -39,9 +39,9 @@ Running the desktop app requires:
 - Windows 11.
 - WebView2 Runtime.
 - PowerShell 7 (`pwsh`) and Windows Terminal (`wt`), both discoverable via `PATH`.
-- OpenCode CLI (`opencode`), discoverable via `PATH`; the CLI must provide the `db path` command and `--session` parameter. Renaming additionally requires CLI support for `--pure serve`.
+- OpenCode CLI (`opencode`), discoverable via `PATH`; database discovery uses `debug paths db` on V2 and `db path` on V1. Opening sessions requires `--session`. Renaming additionally requires the V1 `--pure serve` interface.
 
-The app discovers the database location via `opencode db path`. OpenCode's database schema may change; compatibility depends on the table fields and data formats the app reads. The project does not pin a specific OpenCode version baseline.
+The app supports reading V1 and V2 session tables. When both remain in an upgraded database, it reads the V2 tables rather than stale V1 records. OpenCode's database schema may change; compatibility depends on the table fields and data formats the app reads.
 
 Development and building additionally require Node.js and npm, Rust toolchain with Cargo, Visual Studio C++ build tools with MSVC, and other [Tauri 2 Windows development dependencies](https://v2.tauri.app/start/prerequisites/#windows).
 
@@ -51,10 +51,10 @@ Runtime commands can be checked in PowerShell 7:
 pwsh --version
 wt --version
 opencode --help
-opencode db path
+opencode debug paths db # V2; use opencode db path for V1
 ```
 
-Confirm OpenCode help info contains `--session` and `--pure serve`, and that `opencode db path` returns an existing database file.
+Confirm OpenCode help contains `--session` and the version-appropriate database path command returns an existing file. The current rename and delete implementations require V1 maintenance interfaces.
 
 ## Development and Testing
 
@@ -113,6 +113,7 @@ The manager launches sessions using the session's recorded working directory and
 
 ## Limitations
 
+- OpenCode V2 compatibility covers database discovery, session browsing, and text previews. Rename and delete still use V1 maintenance interfaces and are not supported on V2.
 - The official delete command recursively deletes child sessions. Single session deletion is rejected when child sessions exist; delete child sessions first. Directory batch deletion is also rejected if it involves unselected child sessions. Batch deletion may partially succeed; the UI reports errors and shows actual remaining data. Do not continue creating or modifying related child sessions in other OpenCode windows during deletion.
 - OpenCode's database schema and JSON format may change. The app depends on the table fields and data shapes it currently reads; if incompatible, directory reading may fail and the manager will not attempt to repair the database.
 - Opening a session requires its recorded working directory to still exist and OpenCode CLI to support `--session`.
@@ -124,7 +125,7 @@ The manager launches sessions using the session's recorded working directory and
 
 ## Troubleshooting
 
-If sessions cannot be loaded, confirm the environment launching the app can find `opencode` via `PATH`, that `opencode db path` points to an existing and readable file, and that the database format is compatible. Restart the app after modifying `PATH` or fixing discovery errors.
+If sessions cannot be loaded, confirm the environment launching the app can find `opencode` via `PATH`, that `opencode debug paths db` (V2) or `opencode db path` (V1) points to an existing and readable file, and that the database format is compatible. Restart the app after modifying `PATH` or fixing discovery errors.
 
 If Windows Terminal does not open the selected session, confirm `wt`, `pwsh`, and `opencode` are all discoverable via `PATH`, OpenCode help info contains `--session`, and the session working directory still exists. Check errors in the new terminal. The manager can report dispatched requests but cannot confirm whether the TUI is ready.
 

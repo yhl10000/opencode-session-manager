@@ -13,7 +13,7 @@ pub struct Repository {
     version: String,
 }
 
-const SESSION_FIELDS: &str = "s.id,s.project_id,s.title,s.directory,s.time_created,s.time_updated,
+const SESSION_FIELDS: &str = "s.id,s.project_id,coalesce(s.title,''),s.directory,s.time_created,s.time_updated,
     coalesce(counts.amount,0),
     CASE WHEN json_valid(s.model) THEN coalesce(json_extract(s.model,'$.id'),json_extract(s.model,'$.modelID')) ELSE s.model END,
     CASE WHEN json_valid(s.model) THEN json_extract(s.model,'$.providerID') ELSE NULL END,
@@ -24,6 +24,18 @@ const SESSION_FIELDS: &str = "s.id,s.project_id,s.title,s.directory,s.time_creat
 const LATEST_ASSISTANT: &str = "SELECT json_object('model',json_extract(data,'$.modelID'),'provider',json_extract(data,'$.providerID'))
     FROM message WHERE session_id=?1 AND json_valid(data) AND json_extract(data,'$.role')='assistant'
     ORDER BY time_created DESC,id DESC LIMIT 1";
+
+const LATEST_ASSISTANT_V2: &str = "SELECT json_object('model',json_extract(data,'$.model.id'),'provider',json_extract(data,'$.model.providerID'))
+    FROM session_message WHERE session_id=?1 AND json_valid(data) AND type='assistant'
+    ORDER BY seq DESC LIMIT 1";
+
+fn uses_v2(db: &Connection) -> Result<bool> {
+    Ok(db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='session_v2')",
+        [],
+        |row| row.get(0),
+    )?)
+}
 
 #[derive(serde::Deserialize)]
 struct AssistantMetadata {
@@ -53,14 +65,20 @@ impl Repository {
     pub fn catalog(&self) -> Result<Catalog> {
         let mut db = self.connect()?;
         let transaction = db.transaction()?;
-        let sql = format!("WITH counts AS (SELECT session_id,count(*) amount FROM message GROUP BY session_id)
-            SELECT {SESSION_FIELDS} FROM session s LEFT JOIN counts ON counts.session_id=s.id ORDER BY s.time_updated DESC,s.id DESC");
+        let v2 = uses_v2(&transaction)?;
+        let (sessions_table, messages_table) = if v2 {
+            ("session_v2", "session_message")
+        } else {
+            ("session", "message")
+        };
+        let sql = format!("WITH counts AS (SELECT session_id,count(*) amount FROM {messages_table} GROUP BY session_id)
+            SELECT {SESSION_FIELDS} FROM {sessions_table} s LEFT JOIN counts ON counts.session_id=s.id ORDER BY s.time_updated DESC,s.id DESC");
         let mut sessions = transaction
             .prepare(&sql)?
             .query_map([], summary_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         for session in &mut sessions {
-            supplement_model(&transaction, session)?;
+            supplement_model(&transaction, session, v2)?;
         }
         let projects = group_directories(&mut sessions);
         Ok(Catalog {
@@ -74,9 +92,10 @@ impl Repository {
     pub fn detail(&self, id: &str) -> Result<SessionDetail> {
         let mut db = self.connect()?;
         let transaction = db.transaction()?;
-        let mut session = read_session(&transaction, id)?;
+        let v2 = uses_v2(&transaction)?;
+        let mut session = read_session(&transaction, id, v2)?;
         group_directories(std::slice::from_mut(&mut session));
-        let (preview, preview_truncated) = preview::read(&transaction, &session)?;
+        let (preview, preview_truncated) = preview::read(&transaction, &session, v2)?;
         Ok(SessionDetail {
             session,
             preview,
@@ -85,18 +104,24 @@ impl Repository {
     }
 
     pub fn session(&self, id: &str) -> Result<SessionSummary> {
-        read_session(&self.connect()?, id)
+        let db = self.connect()?;
+        read_session(&db, id, uses_v2(&db)?)
     }
 }
 
-fn read_session(db: &Connection, id: &str) -> Result<SessionSummary> {
-    let sql = format!("WITH counts AS (SELECT session_id,count(*) amount FROM message WHERE session_id=?1 GROUP BY session_id)
-        SELECT {SESSION_FIELDS} FROM session s LEFT JOIN counts ON counts.session_id=s.id WHERE s.id=?1");
+fn read_session(db: &Connection, id: &str, v2: bool) -> Result<SessionSummary> {
+    let (sessions_table, messages_table) = if v2 {
+        ("session_v2", "session_message")
+    } else {
+        ("session", "message")
+    };
+    let sql = format!("WITH counts AS (SELECT session_id,count(*) amount FROM {messages_table} WHERE session_id=?1 GROUP BY session_id)
+        SELECT {SESSION_FIELDS} FROM {sessions_table} s LEFT JOIN counts ON counts.session_id=s.id WHERE s.id=?1");
     let mut session = db
         .query_row(&sql, [id], summary_row)
         .optional()?
         .ok_or_else(|| BackendError::MissingSession(id.into()))?;
-    supplement_model(db, &mut session)?;
+    supplement_model(db, &mut session, v2)?;
     Ok(session)
 }
 
@@ -116,10 +141,18 @@ fn summary_row(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
     })
 }
 
-fn supplement_model(db: &Connection, session: &mut SessionSummary) -> Result<()> {
+fn supplement_model(db: &Connection, session: &mut SessionSummary, v2: bool) -> Result<()> {
     if session.model.is_none() || session.provider.is_none() {
         let raw: Option<String> = db
-            .query_row(LATEST_ASSISTANT, [&session.id], |row| row.get(0))
+            .query_row(
+                if v2 {
+                    LATEST_ASSISTANT_V2
+                } else {
+                    LATEST_ASSISTANT
+                },
+                [&session.id],
+                |row| row.get(0),
+            )
             .optional()?;
         if let Some(raw) = raw {
             let metadata: AssistantMetadata = serde_json::from_str(&raw).map_err(|error| {

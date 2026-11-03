@@ -11,17 +11,40 @@ const TOTAL_CHAR_LIMIT: usize = 24_000;
 pub(crate) fn read(
     db: &Connection,
     session: &SessionSummary,
+    v2: bool,
 ) -> Result<(Vec<PreviewMessage>, bool)> {
-    let mut preview = db.prepare("SELECT id,CASE WHEN json_valid(data) THEN coalesce(json_extract(data,'$.role'),'unknown') ELSE 'unknown' END,time_created
-        FROM message WHERE session_id=?1 ORDER BY time_created DESC,id DESC LIMIT 40")?
-        .query_map([&session.id], |row| Ok(PreviewMessage { id: row.get(0)?, role: row.get(1)?, created_at: row.get(2)?, text: String::new() }))?
-        .collect::<std::result::Result<Vec<_>,_>>()?;
+    let messages_sql = if v2 {
+        "SELECT id,type,time_created FROM session_message WHERE session_id=?1 ORDER BY seq DESC LIMIT 40"
+    } else {
+        "SELECT id,CASE WHEN json_valid(data) THEN coalesce(json_extract(data,'$.role'),'unknown') ELSE 'unknown' END,time_created
+        FROM message WHERE session_id=?1 ORDER BY time_created DESC,id DESC LIMIT 40"
+    };
+    let mut preview = db
+        .prepare(messages_sql)?
+        .query_map([&session.id], |row| {
+            Ok(PreviewMessage {
+                id: row.get(0)?,
+                role: row.get(1)?,
+                created_at: row.get(2)?,
+                text: String::new(),
+            })
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     preview.reverse();
     let mut truncated = session.message_count > i64::try_from(MESSAGE_LIMIT).unwrap_or(i64::MAX);
     let mut remaining = TOTAL_CHAR_LIMIT;
-    let mut parts = db.prepare("SELECT substr(json_extract(data,'$.text'),1,4001) FROM part
+    let parts_sql = if v2 {
+        "SELECT substr(json_extract(data,'$.text'),1,4001) FROM session_message
+         WHERE id=?1 AND session_id=?2 AND type IN ('user','synthetic','system','skill') AND json_valid(data) AND json_type(data,'$.text')='text'
+         UNION ALL SELECT substr(json_extract(data,'$.text'),1,4001) FROM
+         (SELECT data FROM session_part WHERE message_id=?1 AND session_id=?2 AND type='text' AND json_valid(data) AND json_type(data,'$.text')='text'
+          AND EXISTS(SELECT 1 FROM session_message WHERE id=?1 AND session_id=?2 AND type='assistant') ORDER BY ordinal LIMIT 65)"
+    } else {
+        "SELECT substr(json_extract(data,'$.text'),1,4001) FROM part
         WHERE message_id=?1 AND session_id=?2 AND json_valid(data) AND json_extract(data,'$.type')='text'
-        ORDER BY time_created,id LIMIT 65")?;
+        ORDER BY time_created,id LIMIT 65"
+    };
+    let mut parts = db.prepare(parts_sql)?;
     for message in &mut preview {
         let mut budget = MESSAGE_CHAR_LIMIT.min(remaining);
         let mut rows = parts.query([&message.id, &session.id])?;
