@@ -33,7 +33,7 @@ export function installFixture() {
   );
   const catalog = () => ({
     databasePath: "Q:\\test-only\\opencode.db",
-    opencodeVersion: "1.19.0",
+    opencodeVersion: "opencode v2.2.5",
     projects: projects.filter((project) =>
       sessions.some(
         (item) => item.projectId === project.id && !window.__QA_DELETED__.includes(item.id),

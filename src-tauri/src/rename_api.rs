@@ -20,6 +20,7 @@ pub(crate) struct RenameApi {
     base: reqwest::Url,
     credentials: Credentials,
     directory: String,
+    pub(crate) v2: bool,
 }
 
 #[derive(Deserialize)]
@@ -48,9 +49,10 @@ struct UpdateTitle<'a> {
 }
 
 pub(crate) fn parse_endpoint(line: &str) -> Result<reqwest::Url> {
+    let line = line.trim();
     let url = line
-        .trim()
         .strip_prefix("opencode server listening on ")
+        .or_else(|| line.strip_prefix("server listening on "))
         .and_then(|text| reqwest::Url::parse(text).ok())
         .ok_or_else(|| BackendError::Rename("Unexpected OpenCode server startup output".into()))?;
     if url.scheme() != "http"
@@ -84,6 +86,7 @@ impl RenameApi {
             base,
             credentials,
             directory: directory.into(),
+            v2: false,
         })
     }
 
@@ -93,12 +96,30 @@ impl RenameApi {
         path: &str,
         title: Option<&str>,
     ) -> Result<T> {
+        let response = self.send(method, path, title)?;
+        let bytes = std::io::Read::take(response, 65537);
+        serde_json::from_reader(bytes)
+            .map_err(|_| BackendError::Rename("Invalid or oversized loopback API response".into()))
+    }
+
+    fn send(
+        &self,
+        method: Method,
+        path: &str,
+        title: Option<&str>,
+    ) -> Result<reqwest::blocking::Response> {
         let mut url = self
             .base
             .join(path)
             .map_err(|_| BackendError::Rename("Invalid API path".into()))?;
-        url.query_pairs_mut()
-            .append_pair("directory", &self.directory);
+        url.query_pairs_mut().append_pair(
+            if self.v2 {
+                "location[directory]"
+            } else {
+                "directory"
+            },
+            &self.directory,
+        );
         let mut request = self
             .client
             .request(method, url)
@@ -117,22 +138,49 @@ impl RenameApi {
                 response.status().as_u16()
             )));
         }
-        let bytes = std::io::Read::take(response, 65537);
-        serde_json::from_reader(bytes)
-            .map_err(|_| BackendError::Rename("Invalid or oversized loopback API response".into()))
+        Ok(response)
+    }
+
+    fn session(&self, id: &str) -> Result<ApiSession> {
+        if !self.v2 {
+            return self.request(Method::GET, &format!("/session/{id}"), None);
+        }
+        #[derive(Deserialize)]
+        struct Envelope {
+            data: V2Session,
+        }
+        #[derive(Deserialize)]
+        struct V2Session {
+            id: String,
+            #[serde(rename = "projectID")]
+            project_id: String,
+            location: ApiPath,
+            #[serde(default)]
+            title: String,
+            time: ApiTime,
+        }
+        let remote: Envelope = self.request(Method::GET, &format!("/api/session/{id}"), None)?;
+        Ok(ApiSession {
+            id: remote.data.id,
+            project_id: remote.data.project_id,
+            directory: remote.data.location.directory,
+            title: remote.data.title,
+            time: remote.data.time,
+        })
     }
 
     pub fn verify_session(&self, session: &SessionSummary) -> Result<()> {
-        let path: ApiPath = self.request(Method::GET, "/path", None)?;
-        if Path::new(&path.directory).canonicalize()?
-            != Path::new(&session.directory).canonicalize()?
-        {
-            return Err(BackendError::Rename(
-                "Server project directory differs from selected session".into(),
-            ));
+        if !self.v2 {
+            let path: ApiPath = self.request(Method::GET, "/path", None)?;
+            if Path::new(&path.directory).canonicalize()?
+                != Path::new(&session.directory).canonicalize()?
+            {
+                return Err(BackendError::Rename(
+                    "Server project directory differs from selected session".into(),
+                ));
+            }
         }
-        let remote: ApiSession =
-            self.request(Method::GET, &format!("/session/{}", session.id), None)?;
+        let remote = self.session(&session.id)?;
         if remote.id != session.id
             || remote.project_id != session.project_id
             || Path::new(&remote.directory).canonicalize()?
@@ -148,6 +196,16 @@ impl RenameApi {
     }
 
     pub fn update(&self, id: &str, title: &str) -> Result<()> {
+        if self.v2 {
+            let response = self.send(Method::PATCH, &format!("/api/session/{id}"), Some(title))?;
+            if response.status() != reqwest::StatusCode::NO_CONTENT {
+                return Err(BackendError::Rename(
+                    "Unexpected session update status; refresh before retrying".into(),
+                ));
+            }
+            // The caller verifies the persisted title in the selected database after stopping the server.
+            return Ok(());
+        }
         let remote: ApiSession =
             self.request(Method::PATCH, &format!("/session/{id}"), Some(title))?;
         if remote.id != id || remote.title != title {

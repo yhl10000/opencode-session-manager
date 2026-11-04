@@ -28,3 +28,4 @@ playwright-report/
 release-assets/
 docs/*
 !docs/architecture.md
+!docs/v2-compatibility.md

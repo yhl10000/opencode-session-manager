@@ -18,6 +18,8 @@ fn invalid_input_is_rejected_before_starting_a_process() -> Result<(), Box<dyn s
     for (id, title) in [
         ("ses_a/evil", "title"),
         ("ses_a", " \n\t "),
+        ("ses_a", "title\u{0000}"),
+        ("ses_a", "title\nmore"),
         ("ses_", "title"),
     ] {
         assert!(matches!(
@@ -41,4 +43,56 @@ fn missing_session_is_rejected_before_starting_a_process() -> Result<(), Box<dyn
         Err(BackendError::MissingSession(_))
     ));
     Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn v2_delete_missing_directory_uses_standalone_verified_cli_and_requires_persisted_deletion() {
+    let (temp, mut discovery) = fixture().unwrap();
+    let path = temp.path().join("rename.db");
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute(
+            "UPDATE session SET directory=?1",
+            [temp.path().join("missing-project").to_str().unwrap()],
+        )
+        .unwrap();
+    discovery.repository = Repository::new(path.clone(), "2.2.5".into());
+    let executable = temp.path().join("synthetic.cmd");
+    let marker = temp.path().join("delete-called");
+    std::fs::write(&executable, format!(
+        "@echo off\r\nif \"%1 %2 %3\"==\"session delete --help\" (echo opencode session delete [flags] ^<sessionID^>& exit /b 0)\r\nif \"%1 %2 %3\"==\"debug paths db\" (echo {}& exit /b 0)\r\nif \"%1 %2 %3 %4\"==\"--standalone session delete ses_c\" (echo called>\"{}\"& exit /b 0)\r\nexit /b 71\r\n",
+        path.display(), marker.display()
+    )).unwrap();
+    discovery.opencode = executable;
+    assert!(session_manager::deletion::delete(&discovery, &["ses_a".into()]).is_err());
+    assert!(!marker.exists());
+    let result = session_manager::deletion::delete(&discovery, &["ses_c".into()]).unwrap();
+    assert!(marker.exists(), "verified V2 command must reach delete");
+    assert!(result.deleted_ids.is_empty());
+    assert_eq!(result.errors.len(), 1);
+    assert!(
+        result
+            .catalog
+            .sessions
+            .iter()
+            .any(|session| session.id == "ses_c")
+    );
+
+    std::fs::remove_file(&marker).unwrap();
+    let script = std::fs::read_to_string(&discovery.opencode).unwrap();
+    let wrong = temp.path().join("wrong.db");
+    std::fs::write(&wrong, "not the selected database").unwrap();
+    std::fs::write(
+        &discovery.opencode,
+        script.replace(&path.display().to_string(), &wrong.display().to_string()),
+    )
+    .unwrap();
+    let result = session_manager::deletion::delete(&discovery, &["ses_c".into()]).unwrap();
+    assert!(
+        !marker.exists(),
+        "database mismatch must block the mutation"
+    );
+    assert!(result.deleted_ids.is_empty());
+    assert!(result.errors[0].contains("database path changed"));
 }

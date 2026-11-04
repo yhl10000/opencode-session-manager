@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { SessionDetail } from "./lib/types";
-import { catalog, session } from "./test/fixtures";
+import { catalog, session, v2Catalog } from "./test/fixtures";
 
 const invoke = vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>();
 beforeEach(() => {
@@ -45,6 +45,39 @@ it("loads preview only when a session is selected", async () => {
   await userEvent.click(row);
   expect(await screen.findByText("Preview content")).toBeInTheDocument();
   expect(invoke).toHaveBeenCalledWith("get_session_detail", { sessionId: "ses_a" });
+});
+it("renders V2 optional metadata, parent sessions, empty titles and V2-specific preview roles", async () => {
+  invoke.mockImplementation(async (command, args) => {
+    if (command === "get_catalog") return v2Catalog;
+    if (command === "get_session_detail") {
+      const selected = v2Catalog.sessions.find((item) => item.id === args?.["sessionId"]);
+      if (!selected) throw new Error("Missing fixture session");
+      return {
+        session: selected,
+        preview: [{ id: "m1", role: "synthetic", text: "V2 preview", createdAt: 2 }],
+        previewTruncated: false,
+      };
+    }
+    throw new Error(`Unexpected test command: ${command}`);
+  });
+  render(<App />);
+
+  expect(
+    await screen.findByRole("button", { name: "Select Untitled session" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Select Child session" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Select Untitled session" }));
+  expect(await screen.findByRole("heading", { name: "Untitled session" })).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("region", { name: "Session details" })).getAllByText("Unavailable"),
+  ).toHaveLength(3);
+
+  await userEvent.click(screen.getByRole("checkbox", { name: "Show child sessions" }));
+  await userEvent.click(screen.getByRole("button", { name: "Select Child session" }));
+
+  expect(await screen.findByText("ses_v2")).toBeInTheDocument();
+  expect(screen.getByText("synthetic")).toBeInTheDocument();
+  expect(screen.getByText("V2 preview")).toBeInTheDocument();
 });
 it("opens a project folder through the existing session directory command", async () => {
   render(<App />);
@@ -170,6 +203,40 @@ it("keeps loaded rows after failed refresh", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Refresh sessions" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Showing the previous catalog");
   expect(screen.getByRole("button", { name: /Select Fix routing/ })).toBeInTheDocument();
+});
+it("ignores a stale catalog refresh after a successful rename", async () => {
+  let resolveRefresh: ((value: unknown) => void) | undefined;
+  let catalogCalls = 0;
+  invoke.mockImplementation(async (command, args) => {
+    if (command === "get_catalog") {
+      catalogCalls++;
+      if (catalogCalls === 2)
+        return new Promise((resolve) => {
+          resolveRefresh = resolve;
+        });
+      return catalog;
+    }
+    if (command === "rename_session")
+      return {
+        ...catalog,
+        sessions: [session({ title: String(args?.["title"]) }), catalog.sessions[1]],
+      };
+    throw new Error(`Unexpected test command: ${command}`);
+  });
+  render(<App />);
+  await screen.findByRole("button", { name: "Select Fix routing" });
+  await userEvent.click(screen.getByRole("button", { name: "Refresh sessions" }));
+  await userEvent.click(screen.getByRole("button", { name: "Actions for Fix routing" }));
+  await userEvent.click(screen.getByRole("menuitem", { name: "Rename session" }));
+  await userEvent.clear(screen.getByRole("textbox", { name: "Session title" }));
+  await userEvent.type(screen.getByRole("textbox", { name: "Session title" }), "New title");
+  await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+  await screen.findByRole("button", { name: "Select New title" });
+
+  await act(async () => resolveRefresh?.(catalog));
+
+  expect(screen.getByRole("button", { name: "Select New title" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Select Fix routing" })).not.toBeInTheDocument();
 });
 
 it("restores invoking row focus when context menu closes with Escape", async () => {

@@ -3,6 +3,110 @@ use session_manager::launcher::{LaunchMode, LaunchTarget, terminal_arguments};
 use std::path::PathBuf;
 
 #[test]
+fn discovered_cli_launches_with_real_help_formats() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let executable = temp.path().join("opencode.exe");
+    let build = std::process::Command::new("rustc")
+        .args(["--edition=2024", "tests/fixtures/discovery_cli.rs", "-o"])
+        .arg(&executable)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    for name in ["wt.exe", "pwsh.exe"] {
+        std::fs::copy(&executable, temp.path().join(name)).unwrap();
+    }
+    for (version, help, supported) in [
+        (
+            "2.2.5",
+            "Flags:\n  --session, -s string  Session ID to continue",
+            true,
+        ),
+        ("1.19.0", "Options:\n  -s, --session  session id", true),
+        (
+            "2.2.5",
+            "Flags:\n  --session-id string\n  --sessionless",
+            false,
+        ),
+    ] {
+        let database = temp.path().join("sessions.db");
+        let _ = std::fs::remove_file(&database);
+        let db = rusqlite::Connection::open(&database).unwrap();
+        let (schema, table, id) = if version.starts_with('2') {
+            (include_str!("schema-v2.sql"), "session_v2", "ses_v2")
+        } else {
+            (include_str!("schema.sql"), "session", "ses_c")
+        };
+        db.execute_batch(schema).unwrap();
+        db.execute(
+            &format!("UPDATE {table} SET directory=?1 WHERE id=?2"),
+            rusqlite::params![temp.path().to_string_lossy(), id],
+        )
+        .unwrap();
+        drop(db);
+        let receipt = temp.path().join("receipt");
+        let _ = std::fs::remove_file(&receipt);
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "discovered_cli_launch_child", "--nocapture"])
+            .env("PATH", temp.path())
+            .env("CLI_DB", &database)
+            .env("CLI_VERSION", version)
+            .env("CLI_HELP", help)
+            .env("CLI_SUPPORTED", supported.to_string())
+            .env("CLI_ID", id)
+            .env("CLI_RECEIPT", &receipt)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "version={version}, help={help}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn discovered_cli_launch_child() {
+    let Some(receipt) = std::env::var_os("CLI_RECEIPT") else {
+        return;
+    };
+    let discovery = session_manager::discovery::discover().unwrap();
+    let supported = std::env::var("CLI_SUPPORTED").unwrap() == "true";
+    assert_eq!(discovery.supports_session, supported);
+    for mode in [LaunchMode::Tab, LaunchMode::Window] {
+        let result =
+            session_manager::launcher::launch(&discovery, &std::env::var("CLI_ID").unwrap(), mode);
+        if !supported {
+            assert!(matches!(
+                result,
+                Err(session_manager::error::BackendError::Discovery(_))
+            ));
+            assert!(!std::path::Path::new(&receipt).exists());
+            continue;
+        }
+        assert!(result.unwrap().contains("Dispatched Windows Terminal"));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !std::path::Path::new(&receipt).exists() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "fake terminal did not dispatch"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let arguments = std::fs::read_to_string(&receipt).unwrap();
+        assert!(arguments.starts_with(match mode {
+            LaunchMode::Tab => "-w\n0\nnew-tab\n",
+            LaunchMode::Window => "-w\nnew\nnew-tab\n",
+        }));
+        std::fs::remove_file(&receipt).unwrap();
+    }
+}
+
+#[test]
 fn encoded_script_keeps_unicode_and_metacharacters_literal() {
     let target = LaunchTarget {
         directory: "Q:\\Unicode 中\\O'Brien;next".into(),

@@ -24,31 +24,40 @@ pub fn rename(discovery: &Discovery, id: &str, title: &str) -> Result<Catalog> {
     if !directory.is_dir() {
         return Err(BackendError::MissingDirectory(session.directory));
     }
+    let v2 = crate::discovery::is_v2(discovery.repository.version());
     let mut check = command(&discovery.opencode, directory);
-    check.args(["--pure", "db", "path"]);
+    check.args(if v2 {
+        &["debug", "paths", "db"][..]
+    } else {
+        &["--pure", "db", "path"][..]
+    });
     let path = PathBuf::from(OwnedProcess::start(&mut check)?.capture()?);
     if path.canonicalize()? != discovery.repository.database_path().canonicalize()? {
         return Err(BackendError::Rename(
             "OpenCode database path changed since discovery; restart the app".into(),
         ));
     }
-    let credentials = Credentials::random()?;
+    let mut credentials = Credentials::random()?;
+    if v2 {
+        credentials.username = "opencode".into();
+    }
     let reserved = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
     let port = reserved.local_addr()?.port().to_string();
     drop(reserved);
     let mut serve = command(&discovery.opencode, directory);
+    if !v2 {
+        serve.arg("--pure");
+    }
+    serve.args(["serve", "--hostname", "127.0.0.1", "--port", &port]);
+    if !v2 {
+        serve.arg("--mdns=false");
+    }
     serve
-        .args([
-            "--pure",
-            "serve",
-            "--hostname",
-            "127.0.0.1",
-            "--port",
-            &port,
-            "--mdns=false",
-        ])
         .env("OPENCODE_SERVER_USERNAME", &credentials.username)
         .env("OPENCODE_SERVER_PASSWORD", &credentials.password);
+    if v2 {
+        serve.env("OPENCODE_PASSWORD", &credentials.password);
+    }
     let mut server = OwnedProcess::start(&mut serve)?;
     let endpoint = parse_endpoint(&server.first_line()?)?;
     if endpoint.port().map(|value| value.to_string()).as_deref() != Some(port.as_str()) {
@@ -57,7 +66,8 @@ pub fn rename(discovery: &Discovery, id: &str, title: &str) -> Result<Catalog> {
         ));
     }
     server.ensure_running()?;
-    let api = RenameApi::new(endpoint, credentials, &session.directory)?;
+    let mut api = RenameApi::new(endpoint, credentials, &session.directory)?;
+    api.v2 = v2;
     api.verify_session(&session)?;
     server.ensure_running()?;
     api.update(id, title)?;

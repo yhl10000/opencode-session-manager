@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { App } from "../App";
-import { catalog, session } from "../test/fixtures";
+import { catalog, session, v2Catalog } from "../test/fixtures";
 
 const invoke = vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>();
 beforeEach(() => {
@@ -25,6 +25,16 @@ beforeEach(() => {
 it("cancels session deletion without calling native delete", async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Delete session Fix routing" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+  expect(invoke.mock.calls.filter(([command]) => command === "delete_sessions")).toHaveLength(0);
+  expect(screen.getByRole("button", { name: "Select Fix routing" })).toBeInTheDocument();
+});
+
+it("cancels project deletion without calling native delete", async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Delete project Alpha" }));
 
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -84,12 +94,56 @@ it("reports deletion failure without hiding the session", async () => {
   expect(screen.getByRole("button", { name: "Select Fix routing" })).toBeInTheDocument();
 });
 
-it("discloses hidden children and includes them in a filtered project deletion", async () => {
-  const sessions = [session(), session({ id: "child", title: "Hidden child", parentId: "ses_a" })];
+it("retries only sessions remaining after a partial project deletion", async () => {
+  const sessions = [
+    session({ id: "first", title: "First session" }),
+    session({ id: "second", title: "Second session" }),
+  ];
   invoke.mockResolvedValue({ ...catalog, sessions });
   render(<App />);
-  await screen.findByRole("button", { name: "Select Fix routing" });
-  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Fix routing" } });
+  fireEvent.click(await screen.findByRole("button", { name: "Delete project Alpha" }));
+  let deleteCalls = 0;
+  invoke.mockImplementation(async (command) => {
+    if (command === "get_catalog") return { ...catalog, sessions };
+    if (command === "delete_sessions") {
+      deleteCalls++;
+      return deleteCalls === 1
+        ? {
+            catalog: { ...catalog, sessions: [sessions[1]] },
+            deletedIds: ["first"],
+            errors: ["Deletion refused: session is still active"],
+          }
+        : {
+            catalog: { ...catalog, projects: [catalog.projects[1]], sessions: [] },
+            deletedIds: ["second"],
+            errors: [],
+          };
+    }
+    throw new Error(`Unexpected test command: ${command}`);
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("session is still active");
+  expect(screen.getByRole("dialog")).toHaveTextContent("1 sessions");
+  expect(screen.queryByRole("button", { name: "Select First session" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Select Second session" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+
+  await waitFor(() =>
+    expect(invoke.mock.calls.filter(([command]) => command === "delete_sessions")).toEqual([
+      ["delete_sessions", { sessionIds: ["first", "second"] }],
+      ["delete_sessions", { sessionIds: ["second"] }],
+    ]),
+  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("discloses and deletes hidden V2 child sessions with their project", async () => {
+  invoke.mockResolvedValue(v2Catalog);
+  render(<App />);
+  await screen.findByRole("button", { name: "Select Untitled session" });
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Alpha" } });
 
   fireEvent.click(screen.getByRole("button", { name: "Delete project Alpha" }));
 
@@ -97,12 +151,14 @@ it("discloses hidden children and includes them in a filtered project deletion",
   expect(screen.getByRole("dialog")).toHaveTextContent("1 hidden child sessions");
   invoke.mockResolvedValue({
     catalog: { ...catalog, projects: [], sessions: [] },
-    deletedIds: ["ses_a", "child"],
+    deletedIds: ["ses_v2", "ses_v2_child"],
     errors: [],
   });
   fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
   await waitFor(() =>
-    expect(invoke).toHaveBeenCalledWith("delete_sessions", { sessionIds: ["ses_a", "child"] }),
+    expect(invoke).toHaveBeenCalledWith("delete_sessions", {
+      sessionIds: ["ses_v2", "ses_v2_child"],
+    }),
   );
 });
 

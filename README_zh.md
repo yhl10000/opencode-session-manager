@@ -26,11 +26,11 @@
 - 搜索项目名称、会话标题、会话 ID、路径、模型和 provider。搜索期间自动展开匹配的项目组。
 - 可在每个项目中固定多个会话；固定状态保存在本机浏览器偏好中，固定会话在所属项目内优先显示，其余会话按最近活动排序。筛选条件同样适用于固定会话。
 - 按最近活动时间或项目名称排序。
-- 重命名会话。操作时按需启动经过认证的本机 OpenCode `--pure serve`，通过 HTTP `PATCH` 请求更新标题，完成后停止该服务进程。
+- 重命名会话。操作时按需启动经过认证的私有 OpenCode 服务，通过对应版本的 HTTP `PATCH` API 更新标题，完成后停止应用启动的服务进程。
 - 查看会话元数据、消息数、可用的模型和 provider、父会话、可用的 token 汇总，以及受限的只读文本预览。
 - 在新的 Windows Terminal 标签页或窗口中打开会话，复制会话 ID，打开会话目录，并刷新目录或所选详情。
 
-应用不支持导出完整对话、重放工具调用或直接编辑 OpenCode 数据库。删除通过 `opencode --pure session delete` 执行，避免维护命令初始化外部插件；重命名同样通过官方 CLI 提供的本机服务完成，不直接写入数据库。正常 TUI 启动保留原配置。数据流和信任边界见[架构说明](docs/architecture.md)，界面约定见[设计说明](DESIGN.md)。
+应用不支持导出完整对话、重放工具调用或直接编辑 OpenCode 数据库。删除通过官方 CLI 执行：V2 使用私有服务（`--standalone`），V1 使用 `--pure session delete`。重命名通过经过认证的私有原生服务完成，不直接写入数据库。正常 TUI 启动保留原配置。数据流和信任边界见[架构说明](docs/architecture.md)，界面约定见[设计说明](DESIGN.md)。
 
 ## 运行要求
 
@@ -39,9 +39,9 @@
 - Windows 11。
 - WebView2 Runtime。
 - PowerShell 7（`pwsh`）和 Windows Terminal（`wt`），且应用可通过 `PATH` 找到它们。
-- OpenCode CLI（`opencode`），且应用可通过 `PATH` 找到它；V2 使用 `debug paths db` 发现数据库，V1 使用 `db path`。打开会话需要 `--session`，重命名还需要 V1 的 `--pure serve` 接口。
+- OpenCode CLI（`opencode`），且应用可通过 `PATH` 找到它；V2 使用 `debug paths db` 发现数据库，V1 使用 `db path`。打开会话需要 `--session`；修改操作需要对应版本的 `serve` 和 `session delete` 接口。
 
-应用支持读取 V1 和 V2 会话表。升级后的数据库若同时保留新旧表，应用读取 V2 表，不展示陈旧的 V1 记录。OpenCode 的数据库 schema 可能变化；兼容性取决于应用读取的表字段和数据格式。
+应用支持读取 V1 和 V2 会话表。升级后的数据库若同时保留新旧表，应用读取 V2 表，不展示陈旧的 V1 记录。OpenCode 的数据库 schema 可能变化；兼容性取决于应用读取的表字段和数据格式。功能/测试对应关系和验证边界见 [V2 兼容性审查](docs/v2-compatibility.md)。
 
 开发和构建还需要 Node.js 与 npm、Rust 工具链与 Cargo、包含 MSVC 的 Visual Studio C++ 构建工具，以及其他 [Tauri 2 Windows 开发依赖](https://v2.tauri.app/start/prerequisites/#windows)。
 
@@ -54,7 +54,7 @@ opencode --help
 opencode debug paths db # V2；V1 使用 opencode db path
 ```
 
-确认 OpenCode 帮助信息包含 `--session`，并且对应版本的数据库路径命令返回现存文件。当前重命名和删除实现需要 V1 维护接口。
+确认 OpenCode 帮助信息包含 `--session`（包括 V2 的 `--session, -s` 格式），并且对应版本的数据库路径命令返回现存文件。
 
 ## 开发与测试
 
@@ -78,6 +78,15 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 npm audit
 ```
+
+安装 OpenCode V2 后，可单独运行隔离的原生回归：
+
+```powershell
+cargo build --locked --manifest-path src-tauri/Cargo.toml --no-default-features --bin v2_smoke
+& .\scripts\v2-native-smoke.ps1
+```
+
+它在临时私有数据库中创建合成会话，通过真实后端和 CLI 验证发现、分组、详情、重命名和带保护的删除，随后清理沙箱。不会修改现有会话，也不提交模型提示。终端/TUI 就绪是独立检查，不能由启动派发回执推断。
 
 ## 构建
 
@@ -113,7 +122,7 @@ Tauri CLI 会将可执行文件和已配置的安装包写入 `src-tauri/target/
 
 ## 限制
 
-- OpenCode V2 兼容范围包括数据库发现、会话浏览和文本预览。重命名和删除仍使用 V1 维护接口，不支持 V2。
+- V2 兼容范围包括发现、浏览/预览、会话启动、重命名和带保护的删除。回归测试覆盖 V2 CLI/API 契约；针对已安装版本的原生验证与夹具测试分开进行。
 - 官方删除命令会递归删除子会话。单会话删除存在子会话时会被拒绝，请先删除子会话；目录批量删除若涉及未选中的子会话也会被拒绝。批量删除可能部分成功，界面会报告错误并展示实际剩余数据。删除时不要在其他 OpenCode 窗口继续创建或修改相关子会话。
 
 - OpenCode 的数据库 schema 和 JSON 格式可能变化。应用依赖当前读取的表字段和数据形状；如果不兼容，目录读取可能失败，管理器不会尝试修复数据库。

@@ -44,6 +44,10 @@ struct AssistantMetadata {
 }
 
 impl Repository {
+    pub(crate) fn version(&self) -> &str {
+        &self.version
+    }
+
     pub fn database_path(&self) -> &std::path::Path {
         &self.path
     }

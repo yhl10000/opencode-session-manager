@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { App } from "../App";
-import { catalog, session } from "../test/fixtures";
+import { catalog, session, v2Catalog } from "../test/fixtures";
 
 const invoke = vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>();
 beforeEach(() => {
@@ -58,6 +58,43 @@ it("seeds the title, rejects whitespace, trims submission and refreshes selected
   expect(await screen.findByRole("heading", { name: "New title" })).toBeInTheDocument();
   expect(invoke.mock.calls.filter(([command]) => command === "get_session_detail")).toHaveLength(2);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("allows renaming a V2 session whose title is empty", async () => {
+  invoke.mockImplementation(async (command, args) => {
+    if (command === "get_catalog") return v2Catalog;
+    if (command === "get_session_detail")
+      return {
+        session: v2Catalog.sessions[0],
+        preview: [],
+        previewTruncated: false,
+      };
+    if (command === "rename_session")
+      return {
+        ...v2Catalog,
+        sessions: v2Catalog.sessions.map((item) =>
+          item.id === args?.["sessionId"] ? { ...item, title: String(args?.["title"]) } : item,
+        ),
+      };
+    throw new Error(`Unexpected command ${command}`);
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Actions for Untitled session" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Rename session" }));
+  const dialog = screen.getByRole("dialog", { name: "Rename session" });
+  const title = within(dialog).getByRole("textbox", { name: "Session title" });
+  expect(title).toHaveValue("");
+  expect(within(dialog).getByRole("button", { name: "Save title" })).toBeDisabled();
+  fireEvent.change(title, { target: { value: "Restored title" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save title" }));
+
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("rename_session", {
+      sessionId: "ses_v2",
+      title: "Restored title",
+    }),
+  );
+  expect(await screen.findByRole("button", { name: "Select Restored title" })).toBeInTheDocument();
 });
 
 it("keeps failed rename editable with original catalog and allows retry", async () => {

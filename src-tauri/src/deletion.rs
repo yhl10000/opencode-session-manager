@@ -1,8 +1,9 @@
 use crate::{
-    discovery::{Discovery, metadata_output},
+    discovery::Discovery,
     dto::{DeleteResult, SessionSummary},
     error::{BackendError, Result},
     launcher::validate_session_id,
+    rename_process::{OwnedProcess, command},
     repository::Repository,
 };
 use std::collections::BTreeSet;
@@ -72,19 +73,63 @@ pub fn execute(
 }
 
 pub fn delete(discovery: &Discovery, ids: &[String]) -> Result<DeleteResult> {
-    let help = metadata_output(&discovery.opencode, &["session", "delete", "--help"])?;
-    if !help.contains("delete <sessionID>") {
-        return Err(BackendError::Deletion(
-            "Installed OpenCode does not support the verified session delete command.".into(),
-        ));
-    }
+    let v2 = crate::discovery::is_v2(discovery.repository.version());
     execute(&discovery.repository, ids, |session| {
-        metadata_output(
-            &discovery.opencode,
-            &["--pure", "session", "delete", &session.id],
-        )?;
+        let directory = std::path::Path::new(&session.directory);
+        let directory = if directory.is_dir() {
+            directory
+        } else {
+            discovery
+                .repository
+                .database_path()
+                .parent()
+                .ok_or_else(|| {
+                    BackendError::Deletion("Selected database has no parent directory".into())
+                })?
+        };
+        let mut help_command = command(&discovery.opencode, directory);
+        help_command.args(["session", "delete", "--help"]);
+        let help = delete_output(&mut help_command)?;
+        if !help.lines().any(|line| {
+            line.contains("delete <sessionID>")
+                || (v2 && line.contains("session delete [flags] <sessionID>"))
+        }) {
+            return Err(BackendError::Deletion(
+                "Installed OpenCode does not support the verified session delete command.".into(),
+            ));
+        }
+        let mut check = command(&discovery.opencode, directory);
+        check.args(if v2 {
+            &["debug", "paths", "db"][..]
+        } else {
+            &["--pure", "db", "path"][..]
+        });
+        let path = delete_output(&mut check)?;
+        if std::path::Path::new(&path).canonicalize()?
+            != discovery.repository.database_path().canonicalize()?
+        {
+            return Err(BackendError::Deletion(
+                "OpenCode database path changed since discovery; restart the app".into(),
+            ));
+        }
+        let mut remove = command(&discovery.opencode, directory);
+        remove.arg(if v2 { "--standalone" } else { "--pure" });
+        remove.args(["session", "delete", &session.id]);
+        delete_output(&mut remove)?;
         Ok(())
     })
+}
+
+fn delete_output(command: &mut std::process::Command) -> Result<String> {
+    OwnedProcess::start(command)
+        .and_then(OwnedProcess::capture)
+        .map_err(|error| {
+            let message = match error {
+                BackendError::Rename(message) => message,
+                other => other.to_string(),
+            };
+            BackendError::Deletion(format!("OpenCode delete command failed: {message}"))
+        })
 }
 
 #[cfg(test)]
@@ -92,6 +137,15 @@ mod tests {
     use super::*;
     use rusqlite::Connection;
     use tempfile::TempDir;
+
+    #[test]
+    fn failed_delete_command_is_reported_as_deletion_not_rename() {
+        let mut command = std::process::Command::new(crate::discovery::executable("pwsh").unwrap());
+        command.args(["-NoProfile", "-Command", "exit 71"]);
+        let error = delete_output(&mut command).unwrap_err();
+        assert!(matches!(error, BackendError::Deletion(_)));
+        assert!(!error.to_string().to_ascii_lowercase().contains("rename"));
+    }
 
     fn fixture() -> Result<(TempDir, Repository)> {
         let temp = TempDir::new()?;

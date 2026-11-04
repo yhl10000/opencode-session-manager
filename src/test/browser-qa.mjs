@@ -52,7 +52,7 @@ try {
   await page.getByRole("checkbox", { name: "Show child sessions" }).waitFor();
   assert.equal(
     await page.locator(".status-bar > span:last-child").textContent(),
-    "OpenCode CLI 1.19.0",
+    "OpenCode CLI opencode v2.2.5",
   );
   assert.equal(await page.locator(".app-version").textContent(), `v${version}`);
   assert.equal(

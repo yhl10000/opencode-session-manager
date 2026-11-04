@@ -80,7 +80,7 @@ pub(crate) fn metadata_output(program: &Path, args: &[&str]) -> Result<String> {
         .map_err(|error| BackendError::Discovery(error.to_string()))
 }
 
-pub(crate) fn database_path_args(version: &str) -> &'static [&'static str] {
+pub(crate) fn is_v2(version: &str) -> bool {
     let version = version
         .trim()
         .strip_prefix("opencode ")
@@ -90,7 +90,11 @@ pub(crate) fn database_path_args(version: &str) -> &'static [&'static str] {
         .split('.')
         .next()
         .and_then(|major| major.parse::<u32>().ok());
-    if major.is_some_and(|major| major >= 2) {
+    major.is_some_and(|major| major >= 2)
+}
+
+pub(crate) fn database_path_args(version: &str) -> &'static [&'static str] {
+    if is_v2(version) {
         &["debug", "paths", "db"]
     } else {
         &["db", "path"]
@@ -101,7 +105,9 @@ pub fn discover() -> Result<Discovery> {
     let opencode = executable("opencode")?;
     let version = metadata_output(&opencode, &["--version"])?;
     let help = metadata_output(&opencode, &["--help"])?;
-    let supports_session = help.split_whitespace().any(|word| word == "--session");
+    let supports_session = help
+        .split_whitespace()
+        .any(|word| word.trim_end_matches(',') == "--session");
     let path = PathBuf::from(metadata_output(&opencode, database_path_args(&version))?);
     if !path.is_absolute() || !path.is_file() {
         return Err(BackendError::Discovery(format!(
@@ -129,6 +135,16 @@ mod tests {
     fn database_path_args_uses_v2_debug_paths_without_pure() {
         for version in ["opencode v2.2.5", "2.2.5", "v2.2.5"] {
             assert_eq!(database_path_args(version), &["debug", "paths", "db"]);
+        }
+    }
+
+    #[test]
+    fn major_version_detection_preserves_v1_and_unknown_versions() {
+        for version in ["1.19.0", "opencode v1.19.0", "", "unknown", "version 2.2.5"] {
+            assert!(!is_v2(version), "{version}");
+        }
+        for version in ["2.2.5", "opencode v2.2.5", " v2.2.5 ", "3.0.0"] {
+            assert!(is_v2(version), "{version}");
         }
     }
 

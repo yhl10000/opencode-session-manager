@@ -37,3 +37,20 @@ export const catalog: Catalog = {
     }),
   ],
 };
+
+export const v2Catalog: Catalog = {
+  ...catalog,
+  opencodeVersion: "opencode v2.2.5",
+  sessions: [
+    session({ id: "ses_v2", title: "", model: null, provider: null, tokens: null }),
+    session({
+      id: "ses_v2_child",
+      title: "Child session",
+      model: null,
+      provider: null,
+      tokens: null,
+      parentId: "ses_v2",
+      updatedAt: 3,
+    }),
+  ],
+};

@@ -26,11 +26,11 @@ The installer uses Tauri's default WebView2 download bootstrapper: if WebView2 R
 - Search project names, session titles, session IDs, paths, models, and providers. Matching project groups are automatically expanded during search.
 - Pin multiple sessions per project; pin state is stored in local browser preferences, pinned sessions appear first within their project, and the remaining sessions are sorted by recent activity. Filter conditions apply to pinned sessions too.
 - Sort by recent activity time or project name.
-- Rename sessions. On demand, an authenticated local OpenCode `--pure serve` is started, session titles are updated via HTTP `PATCH` requests, and the service process is stopped when done.
+- Rename sessions. On demand, an authenticated private OpenCode service is started, session titles are updated via the version-appropriate HTTP `PATCH` API, and the owned service process is stopped when done.
 - View session metadata, message count, available models and providers, parent sessions, available token summaries, and limited read-only text previews.
 - Open sessions in a new Windows Terminal tab or window, copy session ID, open session directory, and refresh directory or selected details.
 
-The app does not support exporting full conversations, replaying tool calls, or directly editing the OpenCode database. Deletion is performed via `opencode --pure session delete`, avoiding maintenance commands initializing external plugins; renaming is similarly done via the native service provided by the official CLI, without writing directly to the database. Normal TUI startup preserves the original configuration. Data flow and trust boundaries are described in [Architecture Overview](docs/architecture.md); UI conventions are described in [Design Notes](DESIGN.md).
+The app does not support exporting full conversations, replaying tool calls, or directly editing the OpenCode database. Deletion uses the official CLI with a private V2 service (`--standalone`), or `--pure session delete` on V1. Renaming uses an authenticated private native service, without writing directly to the database. Normal TUI startup preserves the original configuration. Data flow and trust boundaries are described in [Architecture Overview](docs/architecture.md); UI conventions are described in [Design Notes](DESIGN.md).
 
 ## Requirements
 
@@ -39,9 +39,9 @@ Running the desktop app requires:
 - Windows 11.
 - WebView2 Runtime.
 - PowerShell 7 (`pwsh`) and Windows Terminal (`wt`), both discoverable via `PATH`.
-- OpenCode CLI (`opencode`), discoverable via `PATH`; database discovery uses `debug paths db` on V2 and `db path` on V1. Opening sessions requires `--session`. Renaming additionally requires the V1 `--pure serve` interface.
+- OpenCode CLI (`opencode`), discoverable via `PATH`; database discovery uses `debug paths db` on V2 and `db path` on V1. Opening sessions requires `--session`; mutations require the corresponding version's `serve` and `session delete` interfaces.
 
-The app supports reading V1 and V2 session tables. When both remain in an upgraded database, it reads the V2 tables rather than stale V1 records. OpenCode's database schema may change; compatibility depends on the table fields and data formats the app reads.
+The app supports reading V1 and V2 session tables. When both remain in an upgraded database, it reads the V2 tables rather than stale V1 records. OpenCode's database schema may change; compatibility depends on the table fields and data formats the app reads. See the [V2 compatibility review](docs/v2-compatibility.md) for the feature/test map and verification boundaries.
 
 Development and building additionally require Node.js and npm, Rust toolchain with Cargo, Visual Studio C++ build tools with MSVC, and other [Tauri 2 Windows development dependencies](https://v2.tauri.app/start/prerequisites/#windows).
 
@@ -54,7 +54,7 @@ opencode --help
 opencode debug paths db # V2; use opencode db path for V1
 ```
 
-Confirm OpenCode help contains `--session` and the version-appropriate database path command returns an existing file. The current rename and delete implementations require V1 maintenance interfaces.
+Confirm OpenCode help contains `--session` (including the V2 `--session, -s` form) and the version-appropriate database path command returns an existing file.
 
 ## Development and Testing
 
@@ -78,6 +78,15 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 npm audit
 ```
+
+With OpenCode V2 installed, run the isolated native regression separately:
+
+```powershell
+cargo build --locked --manifest-path src-tauri/Cargo.toml --no-default-features --bin v2_smoke
+& .\scripts\v2-native-smoke.ps1
+```
+
+It creates synthetic sessions in a temporary private database, checks discovery, grouping, detail, rename, and guarded deletion through the real backend and CLI, then removes the sandbox. It does not modify existing sessions or submit model prompts. Terminal/TUI readiness is a separate check, not implied by a successful launch receipt.
 
 ## Building
 
@@ -113,7 +122,7 @@ The manager launches sessions using the session's recorded working directory and
 
 ## Limitations
 
-- OpenCode V2 compatibility covers database discovery, session browsing, and text previews. Rename and delete still use V1 maintenance interfaces and are not supported on V2.
+- V2 compatibility includes discovery, browsing/previews, session launching, rename, and guarded deletion. Regression tests target the V2 CLI/API contracts; native verification against an installed version is separate from fixture tests.
 - The official delete command recursively deletes child sessions. Single session deletion is rejected when child sessions exist; delete child sessions first. Directory batch deletion is also rejected if it involves unselected child sessions. Batch deletion may partially succeed; the UI reports errors and shows actual remaining data. Do not continue creating or modifying related child sessions in other OpenCode windows during deletion.
 - OpenCode's database schema and JSON format may change. The app depends on the table fields and data shapes it currently reads; if incompatible, directory reading may fail and the manager will not attempt to repair the database.
 - Opening a session requires its recorded working directory to still exist and OpenCode CLI to support `--session`.

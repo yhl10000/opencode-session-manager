@@ -1,6 +1,6 @@
 # Architecture
 
-OpenCode Session Manager is a Windows desktop application built with Tauri 2, React, TypeScript, and Rust. The frontend presents a catalog and requests local operations through Tauri commands. The Rust backend discovers the OpenCode CLI, reads its SQLite database, prepares bounded session details, and dispatches launch requests to Windows Terminal. Session renaming starts an authenticated loopback OpenCode `--pure serve` process on demand for an HTTP `PATCH`, then stops the managed process. This is not a public or remote service.
+OpenCode Session Manager is a Windows desktop application built with Tauri 2, React, TypeScript, and Rust. The frontend presents a catalog and requests local operations through Tauri commands. The Rust backend discovers the OpenCode CLI, reads its SQLite database, prepares bounded session details, and dispatches launch requests to Windows Terminal. Session renaming starts an authenticated private loopback OpenCode service on demand for an HTTP `PATCH`, then stops its owned process. This is not a public or remote service.
 
 ## Runtime components
 
@@ -10,7 +10,8 @@ React UI
 Rust desktop backend
   |-- OpenCode CLI: --version, --help, debug paths db (V2) / db path (V1)
   |-- OpenCode SQLite database: read-only queries
-  |-- OpenCode CLI: on-demand --pure serve for authenticated loopback rename
+  |-- OpenCode CLI: owned authenticated loopback serve for rename
+  |-- OpenCode CLI: session delete (--standalone on V2 / --pure on V1)
   `-- Windows Terminal (wt): new tab or window
         `-- pwsh: encoded launch script
               `-- OpenCode CLI: --session <id>
@@ -22,7 +23,7 @@ The desktop backend owns access to the local database and process launcher. Fron
 
 At initial discovery, the backend locates `opencode` on `PATH` and queries its version, help output, and database path using `opencode debug paths db` on V2 or `opencode db path` on V1. It requires an absolute path to an existing database file and checks whether the CLI advertises `--session`. The database path is discovered at runtime; it is not tied to a particular user profile or installation directory. Discovery is cached for the lifetime of the application process.
 
-Each catalog or detail operation opens a fresh SQLite connection with read-only access and enables `query_only`. The application does not directly write, migrate or initialize the database, or make a second copy. Confirmed deletion invokes the officially supported `opencode session delete` command. Rename uses the authenticated loopback HTTP API served by the official OpenCode CLI, never direct SQLite writes. OpenCode uses SQLite WAL journaling; the manager does not run a checkpoint or database maintenance operation.
+Each catalog or detail operation opens a fresh SQLite connection with read-only access and enables `query_only`. The application does not directly write, migrate or initialize the database, or make a second copy. Confirmed deletion invokes `opencode session delete` with a private V2 service or V1 pure mode, after revalidating the database path. Rename uses the authenticated loopback HTTP API served by its owned OpenCode process, never direct SQLite writes. V2 uses the fixed Basic username `opencode`, a fresh random password, `/api/session/{id}` responses with `data` and `location.directory`, and PATCH 204; V1 retains its earlier contract. OpenCode uses SQLite WAL journaling; the manager does not run a checkpoint or database maintenance operation.
 
 The catalog reads V2 `session_v2` and `session_message`, or V1 `session` and `message`, for directory groups, session summaries, and message counts. If V2 tables exist, they take precedence even when empty: retained V1 tables must not surface stale or duplicate sessions. It does not read database project display names or load the body of every message. On selecting a session, detail loading fetches at most 40 messages and their text, with a limit of 4,000 characters per message and a 24,000-character total budget. V2 user text comes from message JSON; assistant text comes from `session_part` ordered by ordinal. Additional part-query limits can also truncate the preview. The detail response identifies truncation. This preview is not a complete transcript or export.
 
@@ -61,7 +62,7 @@ Deletion requires a modal confirmation before IPC invocation. The backend checks
 
 ## Compatibility and failure behavior
 
-The database interface supports V1 `session`/`message`/`part` and V2 `session_v2`/`session_message`/`session_part` table fields and JSON shapes. It does not require the `project` table for directory grouping. OpenCode may change these shapes. If required data cannot be read, catalog or detail loading can fail; the manager does not repair the database. V2 support covers discovery and read-only browsing; rename and delete retain V1 maintenance interfaces and are not supported on V2.
+The database interface supports V1 `session`/`message`/`part` and V2 `session_v2`/`session_message`/`session_part` table fields and JSON shapes. It does not require the `project` table for directory grouping. OpenCode may change these shapes. If required data cannot be read, catalog or detail loading can fail; the manager does not repair the database. Version-aware mutation adapters preserve V1 while handling the V2 CLI and HTTP contracts. `scripts/v2-native-smoke.ps1` exercises actual discovery and mutation functions in an isolated V2 database; frontend fixture tests and synthetic CLI launcher tests cover different boundaries and do not certify an interactive TUI.
 
 Opening a session also requires Windows Terminal, PowerShell 7, and an existing recorded working directory. Initial discovery errors are cached until the manager restarts. A semicolon in the PowerShell executable path is rejected; a semicolon in a working directory is carried inside the encoded script. Terminal process creation is asynchronous and the app cannot guarantee that the TUI is ready.
 
